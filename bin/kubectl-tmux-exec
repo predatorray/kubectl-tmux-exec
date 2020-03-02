@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2020 Wenhao Ji <predator.ray@gmail.com>
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+set -euf -o pipefail
+
+readonly PROG_NAME='kubectl tmux exec'
+
+declare -ra KUBECTL_SHORT_OPTS=(
+    'n'
+    's'
+)
+
+declare -ra KUBECTL_LONG_OPTS=(
+    'container'
+    'cluster'
+    'context'
+    'namespace'
+    'password'
+    'request-timeout'
+    'server'
+    'token'
+    'user'
+    'username'
+)
+
+declare -ra KUBECTL_NOARG_LONG_OPTS=(
+    'insecure-skip-tls-verify'
+)
+
+declare -ra TMUX_LAYOUTS=(
+    'even-horizontal'
+    'even-vertical'
+    'main-horizontal'
+    'main-vertical'
+    'tiled'
+)
+
+function usage() {
+    cat << EOF
+Execute a command in all containers that match the label selector using Tmux.
+
+Examples:
+  # Keep tracking nginx access logs by running 'tail' command from all pods that match the selector 'app=nginx',
+  # using the first container by default
+  ${PROG_NAME} -l app=nginx -- tail -f /var/log/nginx/access.log
+
+  # Open bash terminals that attach to 'nginx' containers of all nginx pods
+  ${PROG_NAME} -l app=nginx -c nginx -it /bin/bash
+
+Options:
+  -c, --container='': Container name. If omitted, the first container in the pod will be chosen
+  -i, --stdin=false: Pass stdin to the container
+  -t, --tty=false: Stdin is a TTY
+  -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
+  --remain-on-exit=false: Remain Tmux window on exit
+  --select-layout=tiled: one of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
+                         main-vertical, or tiled.
+
+Usage:
+  ${PROG_NAME} -l label [-c CONTAINER] [flags] -- COMMAND [args...]
+
+Use "kubectl options" for a list of global command-line options (applies to all commands).
+EOF
+}
+
+function check_required_executables() {
+    for exe in "$@"; do
+        if ! which "${exe}" 2>&1 >/dev/null; then
+            echo >&2 "command not found: ${exe}"
+            exit 127
+        fi
+    done
+}
+
+function error_and_exit() {
+    echo >&2 'error:' "$@"
+    echo >&2 "Run '${PROG_NAME} --help' for more information on the command."
+    exit 1
+}
+
+function ggetopt() {
+    if [[ ! -z "${GNU_GETOPT_PREFIX:-}" ]]; then
+        "${GNU_GETOPT_PREFIX}/bin/getopt" "$@"
+        return
+    fi
+
+    local getopt_test=0
+    getopt -T 2>&1 >/dev/null || getopt_test="$?"
+    if [[ "${getopt_test}" -eq 4 ]]; then
+        getopt "$@"
+        return
+    fi
+    echo >&2 'The getopt is not GNU enhanced version.'
+    echo >&2 'Please install gnu-getopt and either add it your PATH or set GNU_GETOPT_PREFIX env variable to its installed location.'
+    exit 4
+}
+
+function array_contains() {
+    local occur="$1"
+    local arr=("${@:2}")
+    for e in "${arr[@]}"; do
+        if [[ "${e}" == "${occur}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+function main() {
+    local opts
+    opts=$(ggetopt -o hitc:l:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
+        help,stdin,tty,container:,selector:,remain-on-exit,select-layout:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+    eval set -- $opts
+
+    local selector
+    local container_name
+    local opt_stdin=0
+    local opt_tty=0
+    local kubectl_opts=()
+    local remain_on_exit=0
+    local tmux_layout='tiled'
+    while [[ $# -gt 0 ]]; do
+        local opt="$1"
+        case "${opt}" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            -c|--container)
+                shift
+                container_name="$1"
+                ;;
+            -i|--stdin)
+                opt_stdin=1
+                ;;
+            -t|--tty)
+                opt_tty=1
+                ;;
+            -l|--selector)
+                shift
+                selector="$1"
+                ;;
+            --remain-on-exit)
+                remain_on_exit=1
+                ;;
+            --select-layout)
+                shift
+                tmux_layout="$1"
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                if [[ "${#opt}" -eq 2 ]]; then
+                    if array_contains "${opt:1}" "${KUBECTL_NOARG_SHORT_OPTS[@]}"; then
+                        kubectl_opts+=("${opt}")
+                    elif array_contains "${opt:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
+                        shift
+                        kubectl_opts+=("${opt}" "$1")
+                    else
+                        break
+                    fi
+                else
+                    if array_contains "${opt:2}" "${KUBECTL_NOARG_LONG_OPTS[@]}"; then
+                        kubectl_opts+=("${opt}")
+                    elif array_contains "${opt:2}" "${KUBECTL_LONG_OPTS[@]}"; then
+                        shift
+                        kubectl_opts+=("${opt}" "$1")
+                    else
+                        break
+                    fi
+                fi
+                ;;
+            *)
+                break
+                ;;
+        esac
+        shift
+    done
+
+    check_required_executables 'kubectl' 'tmux'
+
+    if [[ $# -eq 0 ]]; then
+        error_and_exit 'you must specify at least one command for the container'
+    fi
+
+    if [[ -z "${selector:-}" ]]; then
+       error_and_exit 'The label selector option is required: -l'
+    fi
+
+    if [[ -z "${tmux_layout}" ]] || ! array_contains "${tmux_layout}" "${TMUX_LAYOUTS[@]}"; then
+        error_and_exit "Unknown layout: ${tmux_layout}"
+    fi
+    
+    local commands=("$@")
+
+    local kubectl_exec_opts=''
+    if [[ "${opt_stdin}" -eq 1 ]]; then
+        kubectl_exec_opts="${kubectl_exec_opts} -i"
+    fi
+    if [[ "${opt_tty}" -eq 1 ]]; then
+        kubectl_exec_opts="${kubectl_exec_opts} -t"
+    fi
+    if [[ ! -z "${container_name:-}" ]]; then
+        kubectl_exec_opts="${kubectl_exec_opts} -c ${container_name}"
+    fi
+
+    local exec_cmd_str=''
+    for arg in "${commands[@]}"; do
+        if [[ -z "${exec_cmd_str}" ]]; then
+            exec_cmd_str="$(printf '%q' "${arg}")"
+        else
+            exec_cmd_str="${exec_cmd_str} $(printf '%q' "${arg}")"
+        fi
+    done
+
+    local pods=()
+    while IFS='' read -r pod_name; do
+        pods+=("${pod_name}")
+    done < <(
+        kubectl ${kubectl_opts[@]:-} get pods -l "${selector}" -o custom-columns=':metadata.name' --no-headers
+    )
+
+    if [[ "${#pods[@]}" -eq 0 ]]; then
+        echo >&2 'No pods found.'
+        exit 0
+    fi
+
+    local tmux_commands=()
+    for pod in "${pods[@]}"; do
+        local cmd="kubectl ${kubectl_opts[@]:-} exec ${kubectl_exec_opts} ${pod} -- ${exec_cmd_str}"
+        if [[ "${#tmux_commands[@]}" -eq 0 ]]; then
+            tmux_commands+=('new-session' "${cmd}" ';')
+        else
+            tmux_commands+=('split-window' "${cmd}" ';')
+        fi
+    done
+
+    if [[ "${remain_on_exit}" -eq 1 ]]; then
+        tmux_commands+=('set-option' 'remain-on-exit' 'on' ';')
+    fi
+    tmux_commands+=('select-layout' "${tmux_layout}" ';' 'setw' 'synchronize-panes' 'on' ';')
+
+    exec tmux "${tmux_commands[@]}"
+}
+
+main "$@"
