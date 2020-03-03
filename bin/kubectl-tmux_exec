@@ -21,7 +21,7 @@
 
 set -euf -o pipefail
 
-readonly PROG_NAME='kubectl tmux exec'
+readonly PROG_NAME='kubectl tmux-exec'
 
 declare -ra KUBECTL_SHORT_OPTS=(
     'n'
@@ -39,6 +39,7 @@ declare -ra KUBECTL_LONG_OPTS=(
     'token'
     'user'
     'username'
+    'kubeconfig'
 )
 
 declare -ra KUBECTL_NOARG_LONG_OPTS=(

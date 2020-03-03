@@ -9,7 +9,7 @@ Instead of `exec bash` into multiple pod's containers one-at-a-time, like `kubec
 You can now use
 
 ```sh
-kubectl tmux exec -it -l app=nginx /bin/bash
+kubectl tmux-exec -it -l app=nginx /bin/bash
 ```
 
 # Installation via Homebrew
@@ -22,11 +22,11 @@ After that, execute the command below.
 brew install predatorray/brew/kubectl-tmux-exec
 ```
 
-The script should be installed under `/usr/local/bin/kubectl-tmux-exec` by default. Please ensure the `bin` directory is in your `$PATH` environment variable.
+The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by default. Please ensure the `bin` directory is in your `$PATH` environment variable.
 
 # Usage
 
-To execute this script as a [plugin]((https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/)), a `kubectl` version prior to `1.12.0` is required and the latest version is preferred. But you can execute the script directly like `kubectl-tmux-exec [...ARGS]` if it is not supported.
+To execute this script as a [plugin]((https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/)), a `kubectl` version prior to `1.12.0` is required and the latest version is preferred. But you can execute the script directly like `kubectl-tmux_exec [...ARGS]` if it is not supported.
 
 If it is supported, you can check if the script has been added to kubectl's plugin list by
 
@@ -39,7 +39,7 @@ The output should be like
 ```txt
 The following compatible plugins are available:
 
-/usr/local/bin/kubectl-tmux-exec
+/usr/local/bin/kubectl-tmux_exec
 ```
 
 If it does not show in the list, check `$PATH` env again.
@@ -47,23 +47,23 @@ If it does not show in the list, check `$PATH` env again.
 You can use the command below to get the usage of the script.
 
 ```sh
-kubectl tmux exec --help
+kubectl tmux-exec --help
 ```
 
 Or, execute it directly.
 
 ```
-kubectl-tmux-exec --help
+kubectl-tmux_exec --help
 ```
 
 ## Example
 
-The `tmux exec` is similar to `exec`, except that it requires label selectors while `exec` requires a pod name.
+The `tmux-exec` is similar to `exec`, except that it requires label selectors while `exec` requires a pod name.
 
 To `bash` into all pod containers that share some common labels, `foo=bar` for instance.
 
 ```sh
-kubectl tmux exec -it -l foo=bar /bin/bash
+kubectl tmux-exec -it -l foo=bar /bin/bash
 ```
 
 It should be noted that the `-i` / `--stdin` and `-t` / `--tty` options must both be turned on when you are trying to initiate an interactive session. If not, there will not be any errors. Instead, the `tmux` process simply exits because the `exec`-ed command exits due to no inputs.
