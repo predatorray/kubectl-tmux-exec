@@ -1,6 +1,6 @@
 # kubectl-tmux-exec
 
-![homebrew](https://img.shields.io/badge/homebrew-0.0.2-orange)
+![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 A kubectl plugin that uses [Tmux](https://github.com/tmux/tmux) to multiplex commands to pods.
