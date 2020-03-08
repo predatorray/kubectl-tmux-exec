@@ -64,19 +64,24 @@ Examples:
   ${PROG_NAME} -l app=nginx -- tail -f /var/log/nginx/access.log
 
   # Open bash terminals that attach to 'nginx' containers of all nginx pods
-  ${PROG_NAME} -l app=nginx -c nginx -it /bin/bash
+  ${PROG_NAME} -l app=nginx -c nginx /bin/bash
+
+  # Read pod names from a file instead of using a selector
+  ${PROG_NAME} -f pods.txt /bin/bash
+  ${PROG_NAME} -f - /bin/bash # read from stdin
 
 Options:
   -c, --container='': Container name. If omitted, the first container in the pod will be chosen
-  -i, --stdin=false: Pass stdin to the container
-  -t, --tty=false: Stdin is a TTY
+  -i, --stdin=true: Pass stdin to the container (deprecated, since it's enabled by default)
+  -t, --tty=true: Stdin is a TTY (deprecated, since it's enabled by default)
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
+  -f, --file: Read pod names line-by-line from a file
   --remain-on-exit=false: Remain Tmux window on exit
-  --select-layout=tiled: one of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
+  --select-layout=tiled: One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
                          main-vertical, or tiled.
 
 Usage:
-  ${PROG_NAME} -l label [-c CONTAINER] [flags] -- COMMAND [args...]
+  ${PROG_NAME} { -l label | -f pod-list-file } [-c CONTAINER] [flags] -- COMMAND [args...]
 
 Use "kubectl options" for a list of global command-line options (applies to all commands).
 EOF
@@ -89,6 +94,10 @@ function check_required_executables() {
             exit 127
         fi
     done
+}
+
+function warn() {
+    echo >&2 'warn:' "$@"
 }
 
 function error_and_exit() {
@@ -127,17 +136,16 @@ function array_contains() {
 
 function main() {
     local opts
-    opts=$(ggetopt -o hitc:l:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,stdin,tty,container:,selector:,remain-on-exit,select-layout:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+    opts=$(ggetopt -o hitc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
+        help,stdin,tty,container:,selector:,remain-on-exit,select-layout:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
     eval set -- $opts
 
     local selector
     local container_name
-    local opt_stdin=0
-    local opt_tty=0
     local kubectl_opts=()
     local remain_on_exit=0
     local tmux_layout='tiled'
+    local pod_list_file
     while [[ $# -gt 0 ]]; do
         local opt="$1"
         case "${opt}" in
@@ -150,10 +158,10 @@ function main() {
                 container_name="$1"
                 ;;
             -i|--stdin)
-                opt_stdin=1
+                warn "The option -i / --stdin is deprecated."
                 ;;
             -t|--tty)
-                opt_tty=1
+                warn "The option -t / --tty is deprecated."
                 ;;
             -l|--selector)
                 shift
@@ -165,6 +173,10 @@ function main() {
             --select-layout)
                 shift
                 tmux_layout="$1"
+                ;;
+            -f|--file)
+                shift
+                pod_list_file="$1"
                 ;;
             --)
                 shift
@@ -204,8 +216,9 @@ function main() {
         error_and_exit 'you must specify at least one command for the container'
     fi
 
-    if [[ -z "${selector:-}" ]]; then
-       error_and_exit 'The label selector option is required: -l'
+    if ( [[ -z "${selector:-}" ]] && [[ -z "${pod_list_file:-}" ]] ) ||
+        ( [[ ! -z "${selector:-}" ]] && [[ ! -z "${pod_list_file:-}" ]] ); then
+       error_and_exit 'you must either specify option -l or -f'
     fi
 
     if [[ -z "${tmux_layout}" ]] || ! array_contains "${tmux_layout}" "${TMUX_LAYOUTS[@]}"; then
@@ -214,13 +227,7 @@ function main() {
     
     local commands=("$@")
 
-    local kubectl_exec_opts=''
-    if [[ "${opt_stdin}" -eq 1 ]]; then
-        kubectl_exec_opts="${kubectl_exec_opts} -i"
-    fi
-    if [[ "${opt_tty}" -eq 1 ]]; then
-        kubectl_exec_opts="${kubectl_exec_opts} -t"
-    fi
+    local kubectl_exec_opts='-i -t'
     if [[ ! -z "${container_name:-}" ]]; then
         kubectl_exec_opts="${kubectl_exec_opts} -c ${container_name}"
     fi
@@ -234,11 +241,22 @@ function main() {
         fi
     done
 
+    if [[ ! -z "${pod_list_file:-}" ]] && [[ "${pod_list_file}" != '-' ]] && [[ ! -f "${pod_list_file}" ]]; then
+        error_and_exit "No such file or directory: ${pod_list_file}"
+    fi
+
     local pods=()
     while IFS='' read -r pod_name; do
+        if [[ -z "${pod_name}" ]]; then
+            continue
+        fi
         pods+=("${pod_name}")
     done < <(
-        kubectl ${kubectl_opts[@]:-} get pods -l "${selector}" -o custom-columns=':metadata.name' --no-headers
+        if [[ -z "${selector:-}" ]]; then
+            cat "${pod_list_file}"
+        else
+            kubectl ${kubectl_opts[@]:-} get pods -l "${selector}" -o custom-columns=':metadata.name' --no-headers
+        fi
     )
 
     if [[ "${#pods[@]}" -eq 0 ]]; then
