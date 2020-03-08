@@ -1,6 +1,6 @@
 # kubectl-tmux-exec
 
-![homebrew](https://img.shields.io/badge/homebrew-0.0.2-orange)
+![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 A kubectl plugin that uses [Tmux](https://github.com/tmux/tmux) to multiplex commands to pods.
@@ -9,12 +9,12 @@ A kubectl plugin that uses [Tmux](https://github.com/tmux/tmux) to multiplex com
 
 It is to `kubectl exec` as `csshX` or `pssh` is to `ssh`.
 
-Instead of `exec bash` into multiple pod's containers one-at-a-time, like `kubectl exec -it pod{N} /bin/bash`.
+Instead of `exec bash` into multiple pod's containers one-at-a-time, like `kubectl exec pod{N} /bin/bash`.
 
 You can now use
 
 ```sh
-kubectl tmux-exec -it -l app=nginx /bin/bash
+kubectl tmux-exec -l app=nginx /bin/bash
 ```
 
 # Installation via Homebrew
@@ -68,10 +68,8 @@ The `tmux-exec` is similar to `exec`, except that it requires label selectors wh
 To `bash` into all pod containers that share some common labels, `foo=bar` for instance.
 
 ```sh
-kubectl tmux-exec -it -l foo=bar /bin/bash
+kubectl tmux-exec -l foo=bar /bin/bash
 ```
-
-It should be noted that the `-i` / `--stdin` and `-t` / `--tty` options must both be turned on when you are trying to initiate an interactive session. If not, there will not be any errors. Instead, the `tmux` process simply exits because the `exec`-ed command exits due to no inputs.
 
 After you have successfully `bash`-ed into your selected containers, a Tmux window is opened actually, where each pane displays the execution result of each pod's container. Your keyboard inputs will be synchronized to all those panes.
 
