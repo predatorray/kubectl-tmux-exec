@@ -17,17 +17,29 @@ You can now use
 kubectl tmux-exec -l app=nginx /bin/bash
 ```
 
-# Installation via Homebrew
+# Installation 
 
-If you do not have Homebrew installed on your mac, please follow [its installation instruction](https://brew.sh/).
+## via Homebrew
 
-After that, execute the command below.
+> **Note**: This is for Mac users only.
 
-```sh
-brew install predatorray/brew/kubectl-tmux-exec
-```
+1. Install [Homebrew](https://brew.sh/).
+
+2. `brew install predatorray/brew/kubectl-tmux-exec`
 
 The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by default. Please ensure the `bin` directory is in your `$PATH` environment variable.
+
+## via Krew
+
+> **Note**: It is recommended for Linux users.
+> 
+> Although it works both on Mac and Linux, it is not recommended for Mac users, since you still may need to install the dependency `gnu-getopt` with the help of Homebrew.
+
+1. Install [Krew](https://krew.sigs.k8s.io/) by following [the user guide](https://krew.sigs.k8s.io/docs/user-guide/setup/install/).
+
+2. `kubectl krew install tmux-exec`
+
+3. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
 
 # Usage
 
