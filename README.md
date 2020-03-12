@@ -74,6 +74,21 @@ Or, execute it directly.
 kubectl-tmux_exec --help
 ```
 
+## Options
+
+Flag | Usage
+--- | ---
+`-l`<br>`--selector` | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must either use `--selector` or `--file` option.
+`-f`<br>`--file` | Read pod names line-by-line from a file.<br>You must either use `--selector` or `--file` option.
+`-c`<br>`--container` | Container name. If omitted, the first container in the pod will be chosen
+`-i`<br>`--stdin` | Pass stdin to the container (**deprecated**, since it's enabled by default)
+`-t`<br>`--tty` | Stdin is a TTY (**deprecated**, since it's enabled by default)
+`-d`<br>`--detach` | Make the Tmux session detached
+`--remain-on-exit` | Remain Tmux window on exit
+`--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
+
+The usage of these options is also available by `--help`.
+
 ## Example
 
 The `tmux-exec` is similar to `exec`, except that it requires label selectors while `exec` requires a pod name.
