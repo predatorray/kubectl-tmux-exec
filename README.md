@@ -1,6 +1,7 @@
 # kubectl-tmux-exec
 
-![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)
+[![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)](https://brew.sh/)
+[![krew](https://img.shields.io/badge/krew-0.0.2-blue)](https://krew.sigs.k8s.io/)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 A kubectl plugin that controls multiple pods simultaneously using [Tmux](https://github.com/tmux/tmux).
