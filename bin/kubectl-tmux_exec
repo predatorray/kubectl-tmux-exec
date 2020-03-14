@@ -76,6 +76,7 @@ Options:
   -t, --tty=true: Stdin is a TTY (deprecated, since it's enabled by default)
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -f, --file: Read pod names line-by-line from a file
+  -d, --detach=false: Make the Tmux session detached
   --remain-on-exit=false: Remain Tmux window on exit
   --select-layout=tiled: One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
                          main-vertical, or tiled.
@@ -136,8 +137,8 @@ function array_contains() {
 
 function main() {
     local opts
-    opts=$(ggetopt -o hitc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,stdin,tty,container:,selector:,remain-on-exit,select-layout:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+    opts=$(ggetopt -o hitdc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
+        help,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
     eval set -- $opts
 
     local selector
@@ -146,6 +147,7 @@ function main() {
     local remain_on_exit=0
     local tmux_layout='tiled'
     local pod_list_file
+    local tmux_detach=0
     while [[ $# -gt 0 ]]; do
         local opt="$1"
         case "${opt}" in
@@ -166,6 +168,9 @@ function main() {
             -l|--selector)
                 shift
                 selector="$1"
+                ;;
+            -d|--detach)
+                tmux_detach=1
                 ;;
             --remain-on-exit)
                 remain_on_exit=1
@@ -268,7 +273,11 @@ function main() {
     for pod in "${pods[@]}"; do
         local cmd="kubectl ${kubectl_opts[@]:-} exec ${kubectl_exec_opts} ${pod} -- ${exec_cmd_str}"
         if [[ "${#tmux_commands[@]}" -eq 0 ]]; then
-            tmux_commands+=('new-session' "${cmd}" ';')
+            if [[ "${tmux_detach}" -eq 0 ]]; then
+                tmux_commands+=('new-session' "${cmd}" ';')
+            else
+                tmux_commands+=('new-session' '-d' "${cmd}" ';')
+            fi
         else
             tmux_commands+=('split-window' "${cmd}" ';')
         fi

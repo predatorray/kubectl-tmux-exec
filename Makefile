@@ -15,11 +15,14 @@ else
     OS_UNAME := $(shell uname -s)
 endif
 
-.PHONY: build sign checksum clean mk-output-dir
+.PHONY: build sign checksum clean mk-output-dir test
 
-all: $(RELEASE_FILE_PATH) $(CHECKSUM_FILE_PATH)
+all: test $(RELEASE_FILE_PATH) $(CHECKSUM_FILE_PATH)
 
 build: $(RELEASE_FILE_PATH)
+
+test:
+	bats test/
 
 checksum: $(CHECKSUM_FILE_PATH)
 
