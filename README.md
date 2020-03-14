@@ -1,9 +1,10 @@
 # kubectl-tmux-exec
 
-![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)
+[![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)](https://brew.sh/)
+[![krew](https://img.shields.io/badge/krew-0.0.2-blue)](https://krew.sigs.k8s.io/)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-A kubectl plugin that uses [Tmux](https://github.com/tmux/tmux) to multiplex commands to pods.
+A kubectl plugin that controls multiple pods simultaneously using [Tmux](https://github.com/tmux/tmux).
 
 ![screenshot](../assets/screenshot.png?raw=true)
 
@@ -72,6 +73,21 @@ Or, execute it directly.
 ```
 kubectl-tmux_exec --help
 ```
+
+## Options
+
+Flag | Usage
+--- | ---
+`-l`<br>`--selector` | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must either use `--selector` or `--file` option.
+`-f`<br>`--file` | Read pod names line-by-line from a file.<br>You must either use `--selector` or `--file` option.
+`-c`<br>`--container` | Container name. If omitted, the first container in the pod will be chosen
+`-i`<br>`--stdin` | Pass stdin to the container (**deprecated**, since it's enabled by default)
+`-t`<br>`--tty` | Stdin is a TTY (**deprecated**, since it's enabled by default)
+`-d`<br>`--detach` | Make the Tmux session detached
+`--remain-on-exit` | Remain Tmux window on exit
+`--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
+
+The usage of these options is also available by `--help`.
 
 ## Example
 
