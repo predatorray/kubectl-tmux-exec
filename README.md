@@ -1,6 +1,6 @@
 # kubectl-tmux-exec
 
-[![homebrew](https://img.shields.io/badge/homebrew-0.0.3-orange)](https://brew.sh/)
+[![homebrew](https://img.shields.io/badge/homebrew-0.0.4-orange)](https://brew.sh/)
 [![krew](https://img.shields.io/badge/krew-0.0.2-blue)](https://krew.sigs.k8s.io/)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
