@@ -118,3 +118,7 @@ All Tmux command starts with a PREFIX. By default the PREFIX is `ctrl+b`. I will
 `C-b xy`, close the current pane.
 
 `C-b &y`, close the window including all panes.
+
+# Support
+
+Please feel free to [open an issue](https://github.com/predatorray/kubectl-tmux-exec/issues/new) if you find any bug or have any suggestion.
