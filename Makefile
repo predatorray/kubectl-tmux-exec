@@ -1,5 +1,5 @@
 NAME=kubectl-tmux-exec
-VERSION=0.0.4
+VERSION=0.1.0
 
 OUTPUT_DIR=output
 RELEASE_FILE_NAME=$(NAME)-$(VERSION).tar.gz

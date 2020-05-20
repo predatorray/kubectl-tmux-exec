@@ -189,9 +189,7 @@ function main() {
                 ;;
             -*)
                 if [[ "${#opt}" -eq 2 ]]; then
-                    if array_contains "${opt:1}" "${KUBECTL_NOARG_SHORT_OPTS[@]}"; then
-                        kubectl_opts+=("${opt}")
-                    elif array_contains "${opt:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
+                    if array_contains "${opt:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
                         shift
                         kubectl_opts+=("${opt}" "$1")
                     else
@@ -281,12 +279,13 @@ function main() {
         else
             tmux_commands+=('split-window' "${cmd}" ';')
         fi
+        tmux_commands+=('select-layout' "${tmux_layout}" ';')
     done
 
     if [[ "${remain_on_exit}" -eq 1 ]]; then
         tmux_commands+=('set-option' 'remain-on-exit' 'on' ';')
     fi
-    tmux_commands+=('select-layout' "${tmux_layout}" ';' 'setw' 'synchronize-panes' 'on' ';')
+    tmux_commands+=('setw' 'synchronize-panes' 'on' ';')
 
     exec tmux "${tmux_commands[@]}"
 }
