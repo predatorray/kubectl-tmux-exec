@@ -1,8 +1,9 @@
 # kubectl-tmux-exec
 
-[![homebrew](https://img.shields.io/badge/homebrew-0.0.4-orange)](https://brew.sh/)
-[![krew](https://img.shields.io/badge/krew-0.0.4-blue)](https://krew.sigs.k8s.io/)
+[![homebrew](https://img.shields.io/badge/homebrew-0.1.0-orange)](https://brew.sh/)
+[![krew](https://img.shields.io/badge/krew-0.1.0-blue)](https://krew.sigs.k8s.io/)
 ![license](https://img.shields.io/badge/license-MIT-green)
+[![Build Status](https://travis-ci.org/predatorray/kubectl-tmux-exec.svg?branch=master)](https://travis-ci.org/predatorray/kubectl-tmux-exec)
 
 A kubectl plugin that controls multiple pods simultaneously using [Tmux](https://github.com/tmux/tmux).
 
@@ -86,6 +87,7 @@ Flag | Usage
 `-d`<br>`--detach` | Make the Tmux session detached
 `--remain-on-exit` | Remain Tmux window on exit
 `--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
+`-V`<br>`--version` | Print the version information
 
 The usage of these options is also available by `--help`.
 
