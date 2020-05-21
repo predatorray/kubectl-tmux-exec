@@ -21,6 +21,15 @@
 
 set -euf -o pipefail
 
+# Stack Overflow: https://stackoverflow.com/a/246128/1122665
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  PROG_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$PROG_DIR/$SOURCE"
+done
+PROG_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
 readonly PROG_NAME='kubectl tmux-exec'
 
 declare -ra KUBECTL_SHORT_OPTS=(
@@ -71,6 +80,7 @@ Examples:
   ${PROG_NAME} -f - /bin/bash # read from stdin
 
 Options:
+  -V, --version: Print the version information
   -c, --container='': Container name. If omitted, the first container in the pod will be chosen
   -i, --stdin=true: Pass stdin to the container (deprecated, since it's enabled by default)
   -t, --tty=true: Stdin is a TTY (deprecated, since it's enabled by default)
@@ -86,6 +96,15 @@ Usage:
 
 Use "kubectl options" for a list of global command-line options (applies to all commands).
 EOF
+}
+
+function print_version() {
+    local version_file="${PROG_DIR}/../VERSION"
+    if [[ -f "${version_file}" ]]; then
+        cat "${version_file}"
+    else
+        echo "unknown"
+    fi
 }
 
 function check_required_executables() {
@@ -137,8 +156,8 @@ function array_contains() {
 
 function main() {
     local opts
-    opts=$(ggetopt -o hitdc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+    opts=$(ggetopt -o hVitdc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
+        help,version,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
     eval set -- $opts
 
     local selector
@@ -153,6 +172,10 @@ function main() {
         case "${opt}" in
             -h|--help)
                 usage
+                exit 0
+                ;;
+            -V|--version)
+                print_version
                 exit 0
                 ;;
             -c|--container)
@@ -189,9 +212,7 @@ function main() {
                 ;;
             -*)
                 if [[ "${#opt}" -eq 2 ]]; then
-                    if array_contains "${opt:1}" "${KUBECTL_NOARG_SHORT_OPTS[@]}"; then
-                        kubectl_opts+=("${opt}")
-                    elif array_contains "${opt:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
+                    if array_contains "${opt:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
                         shift
                         kubectl_opts+=("${opt}" "$1")
                     else
@@ -281,12 +302,13 @@ function main() {
         else
             tmux_commands+=('split-window' "${cmd}" ';')
         fi
+        tmux_commands+=('select-layout' "${tmux_layout}" ';')
     done
 
     if [[ "${remain_on_exit}" -eq 1 ]]; then
         tmux_commands+=('set-option' 'remain-on-exit' 'on' ';')
     fi
-    tmux_commands+=('select-layout' "${tmux_layout}" ';' 'setw' 'synchronize-panes' 'on' ';')
+    tmux_commands+=('setw' 'synchronize-panes' 'on' ';')
 
     exec tmux "${tmux_commands[@]}"
 }
