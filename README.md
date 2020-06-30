@@ -1,7 +1,7 @@
 # kubectl-tmux-exec
 
-[![homebrew](https://img.shields.io/badge/homebrew-0.1.0-orange)](https://brew.sh/)
-[![krew](https://img.shields.io/badge/krew-0.1.0-blue)](https://krew.sigs.k8s.io/)
+[![homebrew](https://img.shields.io/badge/homebrew-0.1.1-orange)](https://brew.sh/)
+[![krew](https://img.shields.io/badge/krew-0.1.1-blue)](https://krew.sigs.k8s.io/)
 ![license](https://img.shields.io/badge/license-MIT-green)
 [![Build Status](https://travis-ci.org/predatorray/kubectl-tmux-exec.svg?branch=master)](https://travis-ci.org/predatorray/kubectl-tmux-exec)
 
@@ -42,6 +42,16 @@ The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by defau
 2. `kubectl krew install tmux-exec`
 
 3. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
+
+## Manually
+
+1. Download the [latest release](https://github.com/predatorray/kubectl-tmux-exec/releases/latest).
+
+2. Unpack the kubectl-tmux-exec-*.tar.gz file and copy all the files to a directory, `/usr/local/kubectl-tmux-exec` for instance.
+
+3. Add the `bin/` directory to PATH. For example, add this line to your rc file: `export PATH="$PATH:/usr/local/kubectl-tmux-exec/bin"`.
+
+4. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
 
 # Usage
 
