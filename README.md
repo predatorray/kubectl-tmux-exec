@@ -86,6 +86,7 @@ Flag | Usage
 `-d`<br>`--detach` | Make the Tmux session detached
 `--remain-on-exit` | Remain Tmux window on exit
 `--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
+`--session-mode` | Where tmux is opened: auto, new-session, current-session
 
 The usage of these options is also available by `--help`.
 
