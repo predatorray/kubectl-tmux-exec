@@ -24,9 +24,9 @@ set -euf -o pipefail
 # Stack Overflow: https://stackoverflow.com/a/246128/1122665
 SOURCE="${BASH_SOURCE[0]}"
 while [[ -h "$SOURCE" ]]; do
-  PROG_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$PROG_DIR/$SOURCE"
+    PROG_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$PROG_DIR/$SOURCE"
 done
 PROG_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 
@@ -63,6 +63,12 @@ declare -ra TMUX_LAYOUTS=(
     'tiled'
 )
 
+declare -ra SESSION_MODES=(
+    'auto'
+    'new-session'
+    'current-session'
+)
+
 function usage() {
     cat << EOF
 Execute a command in all containers that match the label selector using Tmux.
@@ -87,6 +93,10 @@ Options:
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -f, --file: Read pod names line-by-line from a file
   -d, --detach=false: Make the Tmux session detached
+  --session-mode=auto: Where tmux is opened:
+                       new-session (always in a new session no matter whether there is an existing or not)
+                       current-session (re-use the current session)
+                       auto ('current-session' if there is an existing one, otherwise 'new-session')
   --remain-on-exit=false: Remain Tmux window on exit
   --select-layout=tiled: One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
                          main-vertical, or tiled.
@@ -157,7 +167,7 @@ function array_contains() {
 function main() {
     local opts
     opts=$(ggetopt -o hVitdc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,version,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+        help,version,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,session-mode:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
     eval set -- $opts
 
     local selector
@@ -167,6 +177,7 @@ function main() {
     local tmux_layout='tiled'
     local pod_list_file
     local tmux_detach=0
+    local session_mode='auto'
     while [[ $# -gt 0 ]]; do
         local opt="$1"
         case "${opt}" in
@@ -201,6 +212,10 @@ function main() {
             --select-layout)
                 shift
                 tmux_layout="$1"
+                ;;
+            --session-mode)
+                shift
+                session_mode="$1"
                 ;;
             -f|--file)
                 shift
@@ -250,7 +265,11 @@ function main() {
     if [[ -z "${tmux_layout}" ]] || ! array_contains "${tmux_layout}" "${TMUX_LAYOUTS[@]}"; then
         error_and_exit "Unknown layout: ${tmux_layout}"
     fi
-    
+
+    if [[ -z "${session_mode}" ]] || ! array_contains "${session_mode}" "${SESSION_MODES[@]}"; then
+        error_and_exit "Unknown session mode: ${session_mode}"
+    fi
+
     local commands=("$@")
 
     local kubectl_exec_opts='-i -t'
@@ -294,10 +313,21 @@ function main() {
     for pod in "${pods[@]}"; do
         local cmd="kubectl ${kubectl_opts[@]:-} exec ${kubectl_exec_opts} ${pod} -- ${exec_cmd_str}"
         if [[ "${#tmux_commands[@]}" -eq 0 ]]; then
-            if [[ "${tmux_detach}" -eq 0 ]]; then
-                tmux_commands+=('new-session' "${cmd}" ';')
+            local open_command
+            if [[ "${session_mode}" == 'new-session' ]]; then
+                open_command='new-session'
+            elif [[ "${session_mode}" == 'current-session' ]]; then
+                open_command='new-window'
+            elif [[ -z "${TMUX:-}" ]]; then
+                open_command='new-session'
             else
-                tmux_commands+=('new-session' '-d' "${cmd}" ';')
+                open_command='new-window'
+            fi
+
+            if [[ "${tmux_detach}" -eq 0 ]]; then
+                tmux_commands+=("${open_command}" "${cmd}" ';')
+            else
+                tmux_commands+=("${open_command}" '-d' "${cmd}" ';')
             fi
         else
             tmux_commands+=('split-window' "${cmd}" ';')
