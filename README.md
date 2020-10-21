@@ -118,7 +118,7 @@ If you are not familar with Tmux, you can have a look at tmux's man page or onli
 
 ## Tmux cheatsheet
 
-All Tmux command starts with a PREFIX. By default the PREFIX is `ctrl+b`. I will use `C-b` below to stand for it.
+All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</kbd> + <kbd>b</kbd>. I will use `C-b` below to stand for it.
 
 `C-b d`, detach from the session. After that, the Tmux will be running in the backgroud. You can type `tmux a` to re-attach.
 
