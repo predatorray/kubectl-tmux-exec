@@ -1,7 +1,7 @@
 # kubectl-tmux-exec
 
-[![homebrew](https://img.shields.io/badge/homebrew-0.1.1-orange)](https://brew.sh/)
-[![krew](https://img.shields.io/badge/krew-0.1.1-blue)](https://krew.sigs.k8s.io/)
+[![homebrew](https://img.shields.io/badge/homebrew-0.2.0-orange)](https://brew.sh/)
+[![krew](https://img.shields.io/badge/krew-0.2.0-blue)](https://krew.sigs.k8s.io/)
 ![license](https://img.shields.io/badge/license-MIT-green)
 [![Build Status](https://travis-ci.org/predatorray/kubectl-tmux-exec.svg?branch=master)](https://travis-ci.org/predatorray/kubectl-tmux-exec)
 
