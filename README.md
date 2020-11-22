@@ -96,6 +96,7 @@ Flag | Usage
 `-i`<br>`--stdin` | Pass stdin to the container (**deprecated**, since it's enabled by default)
 `-t`<br>`--tty` | Stdin is a TTY (**deprecated**, since it's enabled by default)
 `-d`<br>`--detach` | Make the Tmux session detached
+`-C`<br>`--enable-control-mode` | Start tmux in control mode and echo is disabled. (See: [iTerm2 Integration](#iterm2-integration))
 `--remain-on-exit` | Remain Tmux window on exit
 `--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
 `--session-mode` | Where tmux is opened: auto, new-session, current-session
@@ -114,9 +115,27 @@ kubectl tmux-exec -l foo=bar /bin/bash
 
 After you have successfully `bash`-ed into your selected containers, a Tmux window is opened actually, where each pane displays the execution result of each pod's container. Your keyboard inputs will be synchronized to all those panes.
 
-If you are not familar with Tmux, you can have a look at tmux's man page or online tutorials. Or you can see the cheatsheet below, which will be sufficient I think.
+If you are not familar with Tmux, you can have a look at tmux's man page or online tutorials. Or you can see the [cheatsheet](#tmux-cheatsheet) below, which will be sufficient I think.
 
-## Tmux cheatsheet
+## iTerm2 Integration
+
+Since [iTerm2](https://iterm2.com/index.html) has been [integrated with tmux](https://iterm2.com/documentation-tmux-integration.html), we can have a better native user interface, instead of remembering all the shortcuts.
+
+All we have to do is to turn on the Control Mode, by adding the option `-C` / `--enable-control-mode` when executing the script. After that, the iTerm2 application will take full control of the tmux session.
+
+For example, executing the commands below in an iTerm2 session
+
+```sh
+kubectl tmux-exec -C -l app=nginx /bin/bash
+```
+
+will result in something like the screenshot below.
+
+![screenshot](../assets/screenshot-iterm2-integration.png?raw=true)
+
+Note that, the `synchronize-panes` will be disabled automatically in this mode, since the iTerm2 provides a much easier way to achieve this. To turn this on, press <kbd>⌘</kbd> + <kbd>⌥</kbd> + <kbd>i</kbd>, or click *"Shell"* - *"Broadcast Input"* - *"Broadcast Input to All Panes in Current Tab"* in the menu bar.
+
+## Tmux Cheatsheet
 
 All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</kbd> + <kbd>b</kbd>. I will use `C-b` below to stand for it.
 
