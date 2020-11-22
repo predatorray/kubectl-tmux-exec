@@ -93,6 +93,7 @@ Options:
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -f, --file: Read pod names line-by-line from a file
   -d, --detach=false: Make the Tmux session detached
+  -C, --enable-control-mode: Start tmux in control mode and echo is disabled.
   --session-mode=auto: Where tmux is opened:
                        new-session (always in a new session no matter whether there is an existing or not)
                        current-session (re-use the current session)
@@ -166,8 +167,8 @@ function array_contains() {
 
 function main() {
     local opts
-    opts=$(ggetopt -o hVitdc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,version,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,session-mode:,file:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+    opts=$(ggetopt -o hVitdCc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
+        help,version,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,session-mode:,file:,enable-control-mode,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
     eval set -- $opts
 
     local selector
@@ -178,6 +179,7 @@ function main() {
     local pod_list_file
     local tmux_detach=0
     local session_mode='auto'
+    local enable_control_mode=0
     while [[ $# -gt 0 ]]; do
         local opt="$1"
         case "${opt}" in
@@ -220,6 +222,9 @@ function main() {
             -f|--file)
                 shift
                 pod_list_file="$1"
+                ;;
+            -C|--enable-control-mode)
+                enable_control_mode=1
                 ;;
             --)
                 shift
@@ -310,9 +315,13 @@ function main() {
     fi
 
     local tmux_commands=()
+    if [[ "${enable_control_mode}" -eq 1 ]]; then
+        tmux_commands+=('-CC')
+    fi
+    local cmd_initial_len="${#tmux_commands[@]}"
     for pod in "${pods[@]}"; do
         local cmd="kubectl ${kubectl_opts[@]:-} exec ${kubectl_exec_opts} ${pod} -- ${exec_cmd_str}"
-        if [[ "${#tmux_commands[@]}" -eq 0 ]]; then
+        if [[ "${#tmux_commands[@]}" -eq "${cmd_initial_len}" ]]; then
             local open_command
             if [[ "${session_mode}" == 'new-session' ]]; then
                 open_command='new-session'
@@ -338,7 +347,9 @@ function main() {
     if [[ "${remain_on_exit}" -eq 1 ]]; then
         tmux_commands+=('set-option' 'remain-on-exit' 'on' ';')
     fi
-    tmux_commands+=('setw' 'synchronize-panes' 'on' ';')
+    if [[ "${enable_control_mode}" -eq 0 ]]; then
+        tmux_commands+=('setw' 'synchronize-panes' 'on' ';')
+    fi
 
     exec tmux "${tmux_commands[@]}"
 }
