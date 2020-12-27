@@ -33,15 +33,12 @@ PROG_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 readonly PROG_NAME='kubectl tmux-exec'
 
 declare -ra KUBECTL_SHORT_OPTS=(
-    'n'
     's'
 )
 
 declare -ra KUBECTL_LONG_OPTS=(
     'container'
     'cluster'
-    'context'
-    'namespace'
     'password'
     'request-timeout'
     'server'
@@ -85,9 +82,19 @@ Examples:
   ${PROG_NAME} -f pods.txt /bin/bash
   ${PROG_NAME} -f - /bin/bash # read from stdin
 
+  # Open bash terminals that attach to all nginx pods in both the namespace n1 and n2
+  ${PROG_NAME} -l app=nginx -n ns1 -n n2 /bin/bash
+
+  # Open bash terminals that attach to all nginx pods under both the context c1 and c2
+  ${PROG_NAME} -l app=nginx --context c1 --context c2 /bin/bash
+
 Options:
   -V, --version: Print the version information
   -c, --container='': Container name. If omitted, the first container in the pod will be chosen
+  -n, --namespace='': The namespace scope for this CLI request (can be applied multiple times)
+  --context='': The name of the kubeconfig context to use (can be applied multiple times)
+  -A, --all-namespaces=false: If present, list and execute the requested object(s) across all namespaces.
+                              Namespace in current context is ignored even if specified with --namespace.
   -i, --stdin=true: Pass stdin to the container (deprecated, since it's enabled by default)
   -t, --tty=true: Stdin is a TTY (deprecated, since it's enabled by default)
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
@@ -101,7 +108,7 @@ Options:
   --remain-on-exit=false: Remain Tmux window on exit
   --select-layout=tiled: One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
                          main-vertical, or tiled.
-
+  --dry-run=false: Only print the tmux commands that would be executed.
 Usage:
   ${PROG_NAME} { -l label | -f pod-list-file } [-c CONTAINER] [flags] -- COMMAND [args...]
 
@@ -167,12 +174,14 @@ function array_contains() {
 
 function main() {
     local opts
-    opts=$(ggetopt -o hVitdCc:l:f:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,version,stdin,tty,detach,container:,selector:,remain-on-exit,select-layout:,session-mode:,file:,enable-control-mode,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
+    opts=$(ggetopt -o AhVitdCc:l:f:n:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
+        help,version,dry-run,stdin,tty,detach,container:,selector:,remain-on-exit,all-namespaces,select-layout:,session-mode:,file:,enable-control-mode,namespace:,context:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
     eval set -- $opts
 
     local selector
     local container_name
+    local namespaces=()
+    local contexts=()
     local kubectl_opts=()
     local remain_on_exit=0
     local tmux_layout='tiled'
@@ -180,6 +189,8 @@ function main() {
     local tmux_detach=0
     local session_mode='auto'
     local enable_control_mode=0
+    local all_namespaces=0
+    local dry_run=0
     while [[ $# -gt 0 ]]; do
         local opt="$1"
         case "${opt}" in
@@ -194,6 +205,21 @@ function main() {
             -c|--container)
                 shift
                 container_name="$1"
+                ;;
+            -n|--namespace)
+                shift
+                if [[ "${#namespaces[@]}" -eq 0 ]] || ! array_contains "$1" "${namespaces[@]}"; then
+                    namespaces+=("$1")
+                fi
+                ;;
+            -A|--all-namespaces)
+                all_namespaces=1
+                ;;
+            --context)
+                shift
+                if [[ "${#contexts[@]}" -eq 0 ]] || ! array_contains "$1" "${contexts[@]}"; then
+                    contexts+=("$1")
+                fi
                 ;;
             -i|--stdin)
                 warn "The option -i / --stdin is deprecated."
@@ -225,6 +251,9 @@ function main() {
                 ;;
             -C|--enable-control-mode)
                 enable_control_mode=1
+                ;;
+            --dry-run)
+                dry_run=1
                 ;;
             --)
                 shift
@@ -275,6 +304,14 @@ function main() {
         error_and_exit "Unknown session mode: ${session_mode}"
     fi
 
+    if [[ "${#namespaces[@]}" -eq 0 ]]; then
+        namespaces=('')
+    fi
+
+    if [[ "${#contexts[@]}" -eq 0 ]]; then
+        contexts=('')
+    fi
+
     local commands=("$@")
 
     local kubectl_exec_opts='-i -t'
@@ -295,19 +332,71 @@ function main() {
         error_and_exit "No such file or directory: ${pod_list_file}"
     fi
 
+    local deduplicated_pod_list=()
+    if [[ -z "${selector:-}" ]]; then
+        if [[ "${pod_list_file}" = '-' ]] && [[ -t 0 ]] && [[ -t 2 ]]; then
+            echo >&2 'Reading pod names from stdin... (Press Ctrl-D at the beginning of the last line to stop reading)'
+        fi
+        while IFS='' read -r pod_name; do
+            if [[ -z "${pod_name}" ]]; then
+                continue
+            fi
+            if [[ "${#deduplicated_pod_list[@]}" -eq 0 ]] || ! array_contains "${pod_name}" "${deduplicated_pod_list[@]}"; then
+                deduplicated_pod_list+=("${pod_name}")
+            fi
+        done < <(cat "${pod_list_file}")
+
+        if [[ "${#deduplicated_pod_list[@]}" -eq 0 ]]; then
+            echo >&2 'No pods found.'
+            exit 0
+        fi
+    fi
+
     local pods=()
-    while IFS='' read -r pod_name; do
-        if [[ -z "${pod_name}" ]]; then
-            continue
-        fi
-        pods+=("${pod_name}")
-    done < <(
-        if [[ -z "${selector:-}" ]]; then
-            cat "${pod_list_file}"
+    for ctx_opt in "${contexts[@]}"; do
+        if [[ "${all_namespaces}" -eq 0 ]]; then
+            for ns_opt in "${namespaces[@]}"; do
+                while read -r pod_name namespace; do
+                    if [[ -z "${pod_name}" ]]; then
+                        continue
+                    fi
+                    local pod_info="${pod_name}/${namespace}/${ctx_opt}"
+                    if [[ "${#pods[@]}" -gt 0 ]] && array_contains "${pod_info}" "${pods[@]}"; then
+                        continue
+                    fi
+                    pods+=("${pod_info}")
+                done < <(
+                    if [[ -z "${selector:-}" ]]; then
+                        for pod_name in "${deduplicated_pod_list[@]}"; do
+                            kubectl ${kubectl_opts[@]:-} get pod --context "${ctx_opt}" -n "${ns_opt}" "${pod_name}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+                        done
+                    else
+                        kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -n "${ns_opt}" -l "${selector}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+                    fi
+                )
+            done
         else
-            kubectl ${kubectl_opts[@]:-} get pods -l "${selector}" -o custom-columns=':metadata.name' --no-headers
+            # all namespaces
+            while read -r pod_name namespace; do
+                if [[ -z "${pod_name}" ]]; then
+                    continue
+                fi
+                local pod_info="${pod_name}/${namespace}/${ctx_opt}"
+                if [[ "${#pods[@]}" -gt 0 ]] && array_contains "${pod_info}" "${pods[@]}"; then
+                    continue
+                fi
+                pods+=("${pod_info}")
+            done < <(
+                if [[ -z "${selector:-}" ]]; then
+                    for pod_name in "${deduplicated_pod_list[@]}"; do
+                        kubectl ${kubectl_opts[@]:-} get pod --context "${ctx_opt}" -A "${pod_name}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+                    done
+                else
+                    kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -A -l "${selector}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+                fi
+            )
         fi
-    )
+    done
 
     if [[ "${#pods[@]}" -eq 0 ]]; then
         echo >&2 'No pods found.'
@@ -320,7 +409,18 @@ function main() {
     fi
     local cmd_initial_len="${#tmux_commands[@]}"
     for pod in "${pods[@]}"; do
-        local cmd="kubectl ${kubectl_opts[@]:-} exec ${kubectl_exec_opts} ${pod} -- ${exec_cmd_str}"
+        IFS='/' read -r pod_name namespace context <<< "${pod}"
+        local cmd="kubectl ${kubectl_opts[@]:-}"
+
+        if [[ -n "${namespace}" ]]; then
+            cmd="${cmd} -n ${namespace}"
+        fi
+        if [[ -n "${context}" ]]; then
+            cmd="${cmd} --context ${context}"
+        fi
+
+        cmd="${cmd} exec ${kubectl_exec_opts} ${pod_name} -- ${exec_cmd_str}"
+
         if [[ "${#tmux_commands[@]}" -eq "${cmd_initial_len}" ]]; then
             local open_command
             if [[ "${session_mode}" == 'new-session' ]]; then
@@ -351,7 +451,11 @@ function main() {
         tmux_commands+=('setw' 'synchronize-panes' 'on' ';')
     fi
 
-    exec tmux "${tmux_commands[@]}"
+    if [[ "${dry_run}" -eq 0 ]]; then
+        exec tmux "${tmux_commands[@]}"
+    else
+        echo tmux "${tmux_commands[@]}"
+    fi
 }
 
 main "$@"
