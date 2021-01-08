@@ -21,3 +21,12 @@ before_script:
 script:
   - export PATH="$(pwd)/bin:$PATH"
   - make
+
+deploy:
+  provider: releases
+  api_key: $GITHUB_TOKEN
+  file: output/*
+  skip_cleanup: true
+  draft: true
+  on:
+    tags: true
