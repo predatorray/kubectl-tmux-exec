@@ -96,6 +96,9 @@ Flag | Usage
 `-i`<br>`--stdin` | Pass stdin to the container (**deprecated**, since it's enabled by default)
 `-t`<br>`--tty` | Stdin is a TTY (**deprecated**, since it's enabled by default)
 `-d`<br>`--detach` | Make the Tmux session detached
+`-n`<br>`--namespace=` | The namespace scope for this CLI request (can be applied multiple times)
+`--context` | The name of the kubeconfig context to use (can be applied multiple times)
+`-A`<br>`--all-namespaces` | If present, list and execute the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
 `-C`<br>`--enable-control-mode` | Start tmux in control mode and echo is disabled. (See: [iTerm2 Integration](#iterm2-integration))
 `--remain-on-exit` | Remain Tmux window on exit
 `--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
