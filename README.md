@@ -3,6 +3,7 @@
 ![GitHub release version](https://img.shields.io/github/v/release/predatorray/kubectl-tmux-exec)
 ![License](https://img.shields.io/github/license/predatorray/kubectl-tmux-exec)
 [![Build Status](https://travis-ci.org/predatorray/kubectl-tmux-exec.svg?branch=master)](https://travis-ci.org/predatorray/kubectl-tmux-exec)
+![GitHub all releases](https://img.shields.io/github/downloads/predatorray/kubectl-tmux-exec/total)
 
 A kubectl plugin that controls multiple pods simultaneously using [Tmux](https://github.com/tmux/tmux).
 
