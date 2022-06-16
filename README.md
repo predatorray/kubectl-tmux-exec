@@ -19,9 +19,9 @@ You can now use
 kubectl tmux-exec -l app=nginx /bin/bash
 ```
 
-# Installation 
+## Installation 
 
-## via Homebrew
+### Homebrew
 
 > **Note**: This is for Mac users only.
 
@@ -31,7 +31,7 @@ kubectl tmux-exec -l app=nginx /bin/bash
 
 The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by default. Please ensure the `bin` directory is in your `$PATH` environment variable.
 
-## via Krew
+### Krew
 
 > **Note**: It is recommended for Linux users.
 > 
@@ -43,7 +43,7 @@ The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by defau
 
 3. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
 
-## Manually
+### Manually
 
 1. Download the [latest release](https://github.com/predatorray/kubectl-tmux-exec/releases/latest).
 
@@ -53,11 +53,11 @@ The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by defau
 
 4. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
 
-# Usage
+## Usage
 
-To execute this script as a [plugin]((https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/)), a `kubectl` version prior to `1.12.0` is required and the latest version is preferred. But you can execute the script directly like `kubectl-tmux_exec [...ARGS]` if it is not supported.
+To execute this script as a [plugin]((https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/)), a `kubectl` version prior to `1.12.0` is required and the latest version is preferred. Alternatively, you can also execute the script directly like `kubectl-tmux_exec [...ARGS]` if it is not supported.
 
-If it is supported, you can check if the script has been added to kubectl's plugin list by
+By executing the command below, you can check if the script has been successfully added.
 
 ```sh
 kubectl plugin list
@@ -77,15 +77,12 @@ You can use the command below to get the usage of the script.
 
 ```sh
 kubectl tmux-exec --help
-```
 
-Or, execute it directly.
-
-```
+# or
 kubectl-tmux_exec --help
 ```
 
-## Options
+### Options
 
 Flag | Usage
 --- | ---
@@ -106,7 +103,7 @@ Flag | Usage
 
 The usage of these options is also available by `--help`.
 
-## Example
+### Example
 
 The `tmux-exec` is similar to `exec`, except that it requires label selectors while `exec` requires a pod name.
 
@@ -120,7 +117,7 @@ After you have successfully `bash`-ed into your selected containers, a Tmux wind
 
 If you are not familar with Tmux, you can have a look at tmux's man page or online tutorials. Or you can see the [cheatsheet](#tmux-cheatsheet) below, which will be sufficient I think.
 
-## iTerm2 Integration
+### iTerm2 Integration
 
 Since [iTerm2](https://iterm2.com/index.html) has been [integrated with tmux](https://iterm2.com/documentation-tmux-integration.html), we can have a better native user interface, instead of remembering all the shortcuts.
 
@@ -138,7 +135,7 @@ will result in something like the screenshot below.
 
 Note that, the `synchronize-panes` will be disabled automatically in this mode, since the iTerm2 provides a much easier way to achieve this. To turn this on, press <kbd>⌘</kbd> + <kbd>⌥</kbd> + <kbd>i</kbd>, or click *"Shell"* - *"Broadcast Input"* - *"Broadcast Input to All Panes in Current Tab"* in the menu bar.
 
-## Tmux Cheatsheet
+### Tmux Cheatsheet
 
 All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</kbd> + <kbd>b</kbd>. I will use `C-b` below to stand for it.
 
@@ -154,6 +151,8 @@ All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</k
 
 `C-b &y`, close the window including all panes.
 
-# Support
+## Discussion & Support
 
 Please feel free to [open an issue](https://github.com/predatorray/kubectl-tmux-exec/issues/new) if you find any bug or have any suggestion.
+
+Alternatively, join the [Google Group](https://groups.google.com/g/kubectl-tmux-exec) and start a conversation.
