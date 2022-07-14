@@ -156,3 +156,7 @@ All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</k
 Please feel free to [open an issue](https://github.com/predatorray/kubectl-tmux-exec/issues/new) if you find any bug or have any suggestion.
 
 Alternatively, join the [Google Group](https://groups.google.com/g/kubectl-tmux-exec) and start a conversation.
+
+## Other plugins
+
+[kubectl-alias](https://github.com/predatorray/kubectl-alias): the missing alias command for kubectl.
