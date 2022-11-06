@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Install minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        driver: none
+    - name: Install Bats
+      run: |
+        set -ex
+        git clone https://github.com/bats-core/bats-core.git
+        cd bats-core
+        sudo ./install.sh /usr/local
+    - name: Make
+      run: |
+        set -ex
+        export PATH="$(pwd)/bin:$PATH"
+        make
