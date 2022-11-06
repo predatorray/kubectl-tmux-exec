@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2022 Wenhao Ji <predator.ray@gmail.com>
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+declare -ra KUBECTL_ARG_SHORT_OPTS=(
+    '-s'
+)
+
+declare -ra KUBECTL_ARG_LONG_OPTS=(
+    '--container'
+    '--cluster'
+    '--password'
+    '--request-timeout'
+    '--server'
+    '--token'
+    '--user'
+    '--username'
+    '--kubeconfig'
+)
+
+declare -ra KUBECTL_NOARG_LONG_OPTS=(
+    '--insecure-skip-tls-verify'
+)
+
+declare -ra ALL_NOARG_SHORT_OPTS=(
+    '-A'
+    '-h'
+    '-V'
+    '-i'
+    '-t'
+    '-d'
+    '-C'
+)
+
+declare -ra ALL_ARG_SHORT_OPTS=(
+    '-c'
+    '-l'
+    '-f'
+    '-n'
+    "${KUBECTL_ARG_SHORT_OPTS[@]}"
+)
+
+declare -ra ALL_SHORT_OPTS=(
+    "${ALL_NOARG_SHORT_OPTS[@]}"
+    "${ALL_ARG_SHORT_OPTS[@]}"
+)
+
+declare -ra ALL_NOARG_LONG_OPTS=(
+    '--help'
+    '--version'
+    '--dry-run'
+    '--stdin'
+    '--tty'
+    '--detach'
+    '--remain-on-exit'
+    '--all-namespaces'
+    '--enable-control-mode'
+    "${KUBECTL_NOARG_LONG_OPTS[@]}"
+)
+
+declare -ra ALL_ARG_LONG_OPTS=(
+    '--container'
+    '--selector'
+    '--select-layout'
+    '--session-mode'
+    '--file'
+    '--namespace'
+    '--context'
+    "${KUBECTL_ARG_LONG_OPTS[@]}"
+)
+
+declare -ra ALL_LONG_OPTS=(
+    "${ALL_NOARG_LONG_OPTS[@]}"
+    "${ALL_ARG_LONG_OPTS[@]}"
+)
+
+declare -ra ALL_ARG_OPTS=(
+    "${ALL_ARG_SHORT_OPTS[@]}"
+    "${ALL_ARG_LONG_OPTS[@]}"
+)
+
+declare -ra FILE_OPTS=(
+    '-f'
+    '--file'
+    '--kubeconfig'
+)
+
+declare -ra ALL_OPTS=(
+    "${ALL_SHORT_OPTS[@]}"
+    "${ALL_LONG_OPTS[@]}"
+)
+
+declare -ra TMUX_LAYOUTS=(
+    'even-horizontal'
+    'even-vertical'
+    'main-horizontal'
+    'main-vertical'
+    'tiled'
+)
+
+declare -ra SESSION_MODES=(
+    'auto'
+    'new-session'
+    'current-session'
+)
+
+# Cobra's Shell Comp Directive Constants
+# also see: https://github.com/spf13/cobra/blob/main/completions.go
+readonly NO_FILE_COMP_DIR=':4'
+readonly FILTER_FILE_COMP_DIR=':8'
+
+function array_contains() {
+    local occur="$1"
+    local arr=("${@:2}")
+    for e in "${arr[@]}"; do
+        if [[ "${e}" == "${occur}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+function __complete() {
+    if [[ "$#" -eq 0 ]]; then
+        exit 1
+    fi
+
+    local state='INITIAL'
+    while [[ "$#" -gt 0 ]]; do
+        local arg="$1"
+        shift
+        case "${state}" in
+            'INITIAL')
+                case "${arg}" in
+                    '')
+                        ;;
+                    '-')
+                        state='INITIAL'
+                        ;;
+                    '--')
+                        state='LONG_OPTS_COMP'
+                        ;;
+                    '--session-mode')
+                        state='SESSION_MODE_COMP'
+                        ;;
+                    '--select-layout')
+                        state='TMUX_LAYOUT_COMP'
+                        ;;
+                    *)
+                        if array_contains "${arg}" "${FILE_OPTS[@]}"; then
+                            state='FILE_COMP'
+                        elif array_contains "${arg}" "${ALL_ARG_OPTS[@]}"; then
+                            state='NO_COMP'
+                        fi
+                        ;;
+                esac
+                ;;
+            'LONG_OPTS_COMP')
+                state='EXEC_CMD_COMP'
+                ;;
+            'SESSION_MODE_COMP' | 'TMUX_LAYOUT_COMP' | 'FILE_COMP' | 'NO_COMP')
+                case "${arg}" in
+                    '')
+                        ;;
+                    *)
+                        state='INITIAL'
+                        ;;
+                esac
+                ;;
+            *)
+                ;;
+        esac
+    done
+
+    case "${state}" in
+        'INITIAL')
+            printf -- '%s\n' "${ALL_OPTS[@]}"
+            ;;
+        'LONG_OPTS_COMP')
+            printf -- '%s\n' "${ALL_LONG_OPTS[@]}"
+            ;;
+        'SESSION_MODE_COMP')
+            printf -- '%s\n' "${SESSION_MODES[@]}"
+            ;;
+        'TMUX_LAYOUT_COMP')
+            printf -- '%s\n' "${TMUX_LAYOUTS[@]}"
+            ;;
+        'EXEC_CMD_COMP' | 'NO_COMP')
+            echo "${NO_FILE_COMP_DIR}"
+            ;;
+        'FILE_COMP')
+            echo "${FILTER_FILE_COMP_DIR}"
+            ;;
+    esac
+}
+
+__complete "$@"
