@@ -135,6 +135,10 @@ will result in something like the screenshot below.
 
 Note that, the `synchronize-panes` will be disabled automatically in this mode, since the iTerm2 provides a much easier way to achieve this. To turn this on, press <kbd>⌘</kbd> + <kbd>⌥</kbd> + <kbd>i</kbd>, or click *"Shell"* - *"Broadcast Input"* - *"Broadcast Input to All Panes in Current Tab"* in the menu bar.
 
+### Shell Auto-completion
+
+Please check [this wiki](https://github.com/predatorray/kubectl-tmux-exec/wiki/Shell-Auto-completion) for more information.
+
 ### Tmux Cheatsheet
 
 All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</kbd> + <kbd>b</kbd>. I will use `C-b` below to stand for it.
