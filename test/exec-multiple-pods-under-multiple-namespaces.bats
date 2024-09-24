@@ -47,9 +47,9 @@ function teardown() {
 
     local file_content=
 
-    file_content="$(kubectl -n "${ns1}" exec "${pod_name_under_ns1}" cat /tmp/foobar)"
+    file_content="$(kubectl -n "${ns1}" exec "${pod_name_under_ns1}" -- cat /tmp/foobar)"
     [ "${file_content}" == "${written}" ]
 
-    file_content="$(kubectl -n "${ns2}" exec "${pod_name_under_ns2}" cat /tmp/foobar)"
+    file_content="$(kubectl -n "${ns2}" exec "${pod_name_under_ns2}" -- cat /tmp/foobar)"
     [ "${file_content}" == "${written}" ]
 }

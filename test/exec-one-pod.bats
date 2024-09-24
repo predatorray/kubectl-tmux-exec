@@ -26,7 +26,7 @@ function teardown() {
     wait_until_no_sessions
 
     local file_content=
-    file_content="$(kubectl exec "${pod_name}" cat /tmp/foobar)"
+    file_content="$(kubectl exec "${pod_name}" -- cat /tmp/foobar)"
     
     [ "${file_content}" == "${written}" ]
 }
@@ -39,7 +39,7 @@ function teardown() {
     wait_until_no_sessions
 
     local file_content
-    file_content="$(kubectl exec "${pod_name}" cat /tmp/foobar)"
+    file_content="$(kubectl exec "${pod_name}" -- cat /tmp/foobar)"
     
     [ "${file_content}" == "${written}" ]
 }
@@ -52,7 +52,7 @@ function teardown() {
     wait_until_no_sessions
 
     local file_content=
-    file_content="$(kubectl exec "${pod_name}" cat /tmp/foobar)"
+    file_content="$(kubectl exec "${pod_name}" -- cat /tmp/foobar)"
     
     [ "${file_content}" == "${written}" ]
 }
