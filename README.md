@@ -164,3 +164,11 @@ Alternatively, join the [Google Group](https://groups.google.com/g/kubectl-tmux-
 ## Other plugins
 
 [kubectl-alias](https://github.com/predatorray/kubectl-alias): the missing alias command for kubectl.
+
+## Buy Me a Coffee
+
+If you find this tool useful, [buy me a coffee]. Thanks!
+
+[![](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)][buy me a coffee]
+
+[buy me a coffee]: https://buymeacoffee.com/predatorray
