@@ -5,15 +5,12 @@
 ![Build Status](https://img.shields.io/github/actions/workflow/status/predatorray/kubectl-tmux-exec/ci.yml?branch=master)
 ![GitHub all releases](https://img.shields.io/github/downloads/predatorray/kubectl-tmux-exec/total)
 
-A kubectl plugin that controls multiple pods simultaneously using [Tmux](https://github.com/tmux/tmux).
+A **kubectl** plugin for executing commands interactively across multiple pods or containers using [**tmux**](https://github.com/tmux/tmux),
+like `csshX` or `pssh` but for **Kubernetes**.
 
 ![screenshot](../assets/screenshot.png?raw=true)
 
-It is to `kubectl exec` as `csshX` or `pssh` is to `ssh`.
-
-Instead of `exec bash` into multiple pod's containers one-at-a-time, like `kubectl exec pod{N} /bin/bash`.
-
-You can now use
+To execute command across all the Nginx containers using `bash` for example, run:
 
 ```sh
 kubectl tmux-exec -l app=nginx /bin/bash
@@ -29,7 +26,7 @@ kubectl tmux-exec -l app=nginx /bin/bash
 
 2. `brew install predatorray/brew/kubectl-tmux-exec`
 
-The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by default. Please ensure the `bin` directory is in your `$PATH` environment variable.
+Finally, ensure `/usr/local/bin/kubectl-tmux_exec` is in your `$PATH`.
 
 ### Krew
 
@@ -49,15 +46,17 @@ The script should be installed under `/usr/local/bin/kubectl-tmux_exec` by defau
 
 2. Unpack the kubectl-tmux-exec-*.tar.gz file and copy all the files to a directory, `/usr/local/kubectl-tmux-exec` for instance.
 
-3. Add the `bin/` directory to PATH. For example, add this line to your rc file: `export PATH="$PATH:/usr/local/kubectl-tmux-exec/bin"`.
+3. Add the `bin/` directory to your `$PATH`. For example, add this line to your rc file: `export PATH="$PATH:/usr/local/kubectl-tmux-exec/bin"`.
 
 4. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
 
 ## Usage
 
-To execute this script as a [plugin]((https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/)), a `kubectl` version prior to `1.12.0` is required and the latest version is preferred. Alternatively, you can also execute the script directly like `kubectl-tmux_exec [...ARGS]` if it is not supported.
+Make sure you have `kubectl` ≥ 1.12 ([plugin support]), ideally latest.
 
-By executing the command below, you can check if the script has been successfully added.
+Otherwise, execute the script directly: `kubectl-tmux_exec [...ARGS]`.
+
+Check if the script has been successfully added by:
 
 ```sh
 kubectl plugin list
@@ -84,22 +83,22 @@ kubectl-tmux_exec --help
 
 ### Options
 
-Flag | Usage
---- | ---
-`-V`<br>`--version` | Print the version information
-`-l`<br>`--selector` | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must either use `--selector` or `--file` option.
-`-f`<br>`--file` | Read pod names line-by-line from a file.<br>You must either use `--selector` or `--file` option.
-`-c`<br>`--container` | Container name. If omitted, the first container in the pod will be chosen
-`-i`<br>`--stdin` | Pass stdin to the container (**deprecated**, since it's enabled by default)
-`-t`<br>`--tty` | Stdin is a TTY (**deprecated**, since it's enabled by default)
-`-d`<br>`--detach` | Make the Tmux session detached
-`-n`<br>`--namespace=` | The namespace scope for this CLI request (can be applied multiple times)
-`--context` | The name of the kubeconfig context to use (can be applied multiple times)
-`-A`<br>`--all-namespaces` | If present, list and execute the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-`-C`<br>`--enable-control-mode` | Start tmux in control mode and echo is disabled. (See: [iTerm2 Integration](#iterm2-integration))
-`--remain-on-exit` | Remain Tmux window on exit
-`--select-layout` | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.
-`--session-mode` | Where tmux is opened: auto, new-session, current-session
+| Flag                            | Usage                                                                                                                                                       |
+|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-V`<br>`--version`             | Print the version information                                                                                                                               |
+| `-l`<br>`--selector`            | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must either use `--selector` or `--file` option. |
+| `-f`<br>`--file`                | Read pod names line-by-line from a file.<br>You must either use `--selector` or `--file` option.                                                            |
+| `-c`<br>`--container`           | Container name. If omitted, the first container in the pod will be chosen                                                                                   |
+| `-i`<br>`--stdin`               | Pass stdin to the container (**deprecated**, since it's enabled by default)                                                                                 |
+| `-t`<br>`--tty`                 | Stdin is a TTY (**deprecated**, since it's enabled by default)                                                                                              |
+| `-d`<br>`--detach`              | Make the Tmux session detached                                                                                                                              |
+| `-n`<br>`--namespace=`          | The namespace scope for this CLI request (can be applied multiple times)                                                                                    |
+| `--context`                     | The name of the kubeconfig context to use (can be applied multiple times)                                                                                   |
+| `-A`<br>`--all-namespaces`      | If present, list and execute the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.     |
+| `-C`<br>`--enable-control-mode` | Start tmux in control mode and echo is disabled. (See: [iTerm2 Integration](#iterm2-integration))                                                           |
+| `--remain-on-exit`              | Remain Tmux window on exit                                                                                                                                  |
+| `--select-layout`               | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.                                              |
+| `--session-mode`                | Where tmux is opened: auto, new-session, current-session                                                                                                    |
 
 The usage of these options is also available by `--help`.
 
@@ -119,21 +118,20 @@ If you are not familar with Tmux, you can have a look at tmux's man page or onli
 
 ### iTerm2 Integration
 
-Since [iTerm2](https://iterm2.com/index.html) has been [integrated with tmux](https://iterm2.com/documentation-tmux-integration.html), we can have a better native user interface, instead of remembering all the shortcuts.
+With `-C` or `--enable-control-mode`, it runs in control mode and delegates pane input to [iTerm2]'s "Broadcast Input" feature,
+no need for tmux key bindings.
 
-All we have to do is to turn on the Control Mode, by adding the option `-C` / `--enable-control-mode` when executing the script. After that, the iTerm2 application will take full control of the tmux session.
+Use <kbd>⌘</kbd> + <kbd>⌥</kbd> + <kbd>i</kbd> to toggle broadcasting in iTerm2. (`synchronize-panes` will be disabled automatically in this mode.)
 
-For example, executing the commands below in an iTerm2 session
+(see: [tmux Integration](https://iterm2.com/documentation-tmux-integration.html) for more information)
+
+#### Example
 
 ```sh
 kubectl tmux-exec -C -l app=nginx /bin/bash
 ```
 
-will result in something like the screenshot below.
-
 ![screenshot](../assets/screenshot-iterm2-integration.png?raw=true)
-
-Note that, the `synchronize-panes` will be disabled automatically in this mode, since the iTerm2 provides a much easier way to achieve this. To turn this on, press <kbd>⌘</kbd> + <kbd>⌥</kbd> + <kbd>i</kbd>, or click *"Shell"* - *"Broadcast Input"* - *"Broadcast Input to All Panes in Current Tab"* in the menu bar.
 
 ### Shell Auto-completion
 
@@ -155,11 +153,10 @@ All Tmux command starts with a `PREFIX`. By default the `PREFIX` is <kbd>Ctrl</k
 
 `C-b &y`, close the window including all panes.
 
-## Discussion & Support
+## Community & Support
 
-Please feel free to [open an issue](https://github.com/predatorray/kubectl-tmux-exec/issues/new) if you find any bug or have any suggestion.
-
-Alternatively, join the [Google Group](https://groups.google.com/g/kubectl-tmux-exec) and start a conversation.
+- File issues or feature requests via [GitHub Issues]((https://github.com/predatorray/kubectl-tmux-exec/issues/new))
+- Join the [Google Group](https://groups.google.com/g/kubectl-tmux-exec) for discussions
 
 ## Other plugins
 
@@ -167,8 +164,10 @@ Alternatively, join the [Google Group](https://groups.google.com/g/kubectl-tmux-
 
 ## Buy Me a Coffee
 
-If you find this tool useful, [buy me a coffee]. Thanks!
+If it saves you time, feel free to [buy me a coffee] 🙌
 
 [![](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)][buy me a coffee]
 
 [buy me a coffee]: https://buymeacoffee.com/predatorray
+[iTerm2]: https://iterm2.com/index.html
+[plugin support]: https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/
