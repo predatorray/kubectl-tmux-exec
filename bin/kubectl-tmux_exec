@@ -52,6 +52,16 @@ declare -ra KUBECTL_NOARG_LONG_OPTS=(
     'insecure-skip-tls-verify'
 )
 
+# Options that do NOT take an argument
+declare -ra SCRIPT_NOARG_SHORT_OPTS=(
+    'A' 'h' 'V' 'i' 't' 'd' 'C'
+)
+
+# Options that DO require an argument
+declare -ra SCRIPT_ARG_SHORT_OPTS=(
+    'c' 'l' 'f' 'n'
+)
+
 declare -ra TMUX_LAYOUTS=(
     'even-horizontal'
     'even-vertical'
@@ -144,21 +154,8 @@ function error_and_exit() {
     exit 1
 }
 
-function ggetopt() {
-    if [[ ! -z "${GNU_GETOPT_PREFIX:-}" ]]; then
-        "${GNU_GETOPT_PREFIX}/bin/getopt" "$@"
-        return
-    fi
-
-    local getopt_test=0
-    getopt -T 2>&1 >/dev/null || getopt_test="$?"
-    if [[ "${getopt_test}" -eq 4 ]]; then
-        getopt "$@"
-        return
-    fi
-    echo >&2 'The getopt is not GNU enhanced version.'
-    echo >&2 'Please install gnu-getopt and either add it your PATH or set GNU_GETOPT_PREFIX env variable to its installed location.'
-    exit 4
+function error_option_requires_arg() {
+    error_and_exit "option ${1} requires an argument"
 }
 
 function array_contains() {
@@ -173,11 +170,6 @@ function array_contains() {
 }
 
 function main() {
-    local opts
-    opts=$(ggetopt -o AhVitdCc:l:f:n:"$(printf '%s:' "${KUBECTL_SHORT_OPTS[@]}")" --long \
-        help,version,dry-run,stdin,tty,detach,container:,selector:,remain-on-exit,all-namespaces,select-layout:,session-mode:,file:,enable-control-mode,namespace:,context:,"$(printf '%s:,' "${KUBECTL_LONG_OPTS[@]}")","$(printf '%s,' "${KUBECTL_NOARG_LONG_OPTS[@]}")" -- "$@")
-    eval set -- $opts
-
     local selector
     local container_name
     local namespaces=()
@@ -191,6 +183,7 @@ function main() {
     local enable_control_mode=0
     local all_namespaces=0
     local dry_run=0
+
     while [[ $# -gt 0 ]]; do
         local opt="$1"
         case "${opt}" in
@@ -204,12 +197,36 @@ function main() {
                 ;;
             -c|--container)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 container_name="$1"
+                ;;
+            -c*)
+                container_name="${opt:2}"
+                ;;
+            --container=*)
+                container_name="${opt#*=}"
                 ;;
             -n|--namespace)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 if [[ "${#namespaces[@]}" -eq 0 ]] || ! array_contains "$1" "${namespaces[@]}"; then
                     namespaces+=("$1")
+                fi
+                ;;
+            -n*)
+                local val="${opt:2}"
+                if [[ "${#namespaces[@]}" -eq 0 ]] || ! array_contains "${val}" "${namespaces[@]}"; then
+                    namespaces+=("${val}")
+                fi
+                ;;
+            --namespace=*)
+                local val="${opt#*=}"
+                if [[ "${#namespaces[@]}" -eq 0 ]] || ! array_contains "${val}" "${namespaces[@]}"; then
+                    namespaces+=("${val}")
                 fi
                 ;;
             -A|--all-namespaces)
@@ -217,8 +234,17 @@ function main() {
                 ;;
             --context)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 if [[ "${#contexts[@]}" -eq 0 ]] || ! array_contains "$1" "${contexts[@]}"; then
                     contexts+=("$1")
+                fi
+                ;;
+            --context=*)
+                local val="${opt#*=}"
+                if [[ "${#contexts[@]}" -eq 0 ]] || ! array_contains "${val}" "${contexts[@]}"; then
+                    contexts+=("${val}")
                 fi
                 ;;
             -i|--stdin)
@@ -229,7 +255,16 @@ function main() {
                 ;;
             -l|--selector)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 selector="$1"
+                ;;
+            -l*)
+                selector="${opt:2}"
+                ;;
+            --selector=*)
+                selector="${opt#*=}"
                 ;;
             -d|--detach)
                 tmux_detach=1
@@ -239,15 +274,36 @@ function main() {
                 ;;
             --select-layout)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 tmux_layout="$1"
+                ;;
+            --select-layout=*)
+                tmux_layout="${opt#*=}"
                 ;;
             --session-mode)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 session_mode="$1"
+                ;;
+            --session-mode=*)
+                session_mode="${opt#*=}"
                 ;;
             -f|--file)
                 shift
+                if [[ $# -eq 0 ]]; then
+                    error_option_requires_arg "${opt}"
+                fi
                 pod_list_file="$1"
+                ;;
+            -f*)
+                pod_list_file="${opt:2}"
+                ;;
+            --file=*)
+                pod_list_file="${opt#*=}"
                 ;;
             -C|--enable-control-mode)
                 enable_control_mode=1
@@ -259,23 +315,54 @@ function main() {
                 shift
                 break
                 ;;
+            -??*)
+                local first="${opt:0:2}"
+                local first_char="${first:1}"
+                local rest="${opt:2}"
+
+                if array_contains "${first_char}" "${SCRIPT_NOARG_SHORT_OPTS[@]}" || \
+                   array_contains "${first_char}" "${SCRIPT_ARG_SHORT_OPTS[@]}" || \
+                   array_contains "${first_char}" "${KUBECTL_SHORT_OPTS[@]}"; then
+                    shift
+                    set -- "${first}" "-${rest}" "$@"
+                    continue
+                fi
+                # Fall through to unknown option handling
+                ;&
             -*)
-                if [[ "${#opt}" -eq 2 ]]; then
+                if [[ "${opt}" =~ ^--(.+)=(.+)$ ]]; then
+                    local name="${BASH_REMATCH[1]}"
+                    local val="${BASH_REMATCH[2]}"
+                    if array_contains "${name}" "${KUBECTL_LONG_OPTS[@]}"; then
+                        kubectl_opts+=("--${name}" "${val}")
+                    else
+                        error_and_exit "unknown option: ${opt}"
+                    fi
+                elif [[ "${opt}" =~ ^--(.+)$ ]]; then
+                    local name="${BASH_REMATCH[1]}"
+                    if array_contains "${name}" "${KUBECTL_NOARG_LONG_OPTS[@]}"; then
+                        kubectl_opts+=("${opt}")
+                    elif array_contains "${name}" "${KUBECTL_LONG_OPTS[@]}"; then
+                        shift
+                        if [[ $# -eq 0 ]]; then
+                            error_option_requires_arg "${opt}"
+                        fi
+                        kubectl_opts+=("${opt}" "$1")
+                    else
+                        error_and_exit "unknown option: ${opt}"
+                    fi
+                elif [[ "${#opt}" -eq 2 ]]; then
                     if array_contains "${opt:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
                         shift
+                        if [[ $# -eq 0 ]]; then
+                            error_option_requires_arg "${opt}"
+                        fi
                         kubectl_opts+=("${opt}" "$1")
                     else
-                        break
+                        error_and_exit "unknown option: ${opt}"
                     fi
                 else
-                    if array_contains "${opt:2}" "${KUBECTL_NOARG_LONG_OPTS[@]}"; then
-                        kubectl_opts+=("${opt}")
-                    elif array_contains "${opt:2}" "${KUBECTL_LONG_OPTS[@]}"; then
-                        shift
-                        kubectl_opts+=("${opt}" "$1")
-                    else
-                        break
-                    fi
+                    error_and_exit "unknown option: ${opt}"
                 fi
                 ;;
             *)

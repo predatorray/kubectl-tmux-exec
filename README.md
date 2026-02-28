@@ -30,25 +30,21 @@ Finally, ensure `/usr/local/bin/kubectl-tmux_exec` is in your `$PATH`.
 
 ### Krew
 
-> **Note**: It is recommended for Linux users.
-> 
-> Although it works both on Mac and Linux, it is not recommended for Mac users, since you still may need to install the dependency `gnu-getopt` with the help of Homebrew.
-
 1. Install [Krew](https://krew.sigs.k8s.io/) by following [the user guide](https://krew.sigs.k8s.io/docs/user-guide/setup/install/).
 
 2. `kubectl krew install tmux-exec`
 
-3. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
+3. Install [`tmux`](https://github.com/tmux/tmux/wiki/Installing).
 
 ### Manually
 
 1. Download the [latest release](https://github.com/predatorray/kubectl-tmux-exec/releases/latest).
 
-2. Unpack the kubectl-tmux-exec-*.tar.gz file and copy all the files to a directory, `/usr/local/kubectl-tmux-exec` for instance.
+2. Unpack the `kubectl-tmux-exec-*.tar.gz` file and copy all the files to a directory, `/usr/local/kubectl-tmux-exec` for instance.
 
 3. Add the `bin/` directory to your `$PATH`. For example, add this line to your rc file: `export PATH="$PATH:/usr/local/kubectl-tmux-exec/bin"`.
 
-4. Install the dependencies. ([Wiki: How-to-Install-Dependencies](https://github.com/predatorray/kubectl-tmux-exec/wiki/How-to-Install-Dependencies))
+4. Install [`tmux`](https://github.com/tmux/tmux/wiki/Installing).
 
 ## Usage
 
