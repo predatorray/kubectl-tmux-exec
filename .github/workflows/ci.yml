@@ -18,6 +18,12 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+    - name: Create the CNI config directory
+      # setup-minikube's none-driver setup runs `chmod 755 /etc/cni/net.d`,
+      # assuming the directory was already created by the podman package that
+      # used to ship in the runner image. It no longer is, so the chmod fails
+      # with "No such file or directory" and the whole step errors out.
+      run: sudo mkdir -p /etc/cni/net.d
     - name: Install minikube
       uses: medyagh/setup-minikube@master
       with:
