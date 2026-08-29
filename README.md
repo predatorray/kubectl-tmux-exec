@@ -1,3 +1,35 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="center">
+        <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=en">English</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=zh-CN">简体中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=zh-TW">繁體中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=ja">日本語</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=ko">한국어</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=hi">हिन्दी</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=th">ไทย</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=fr">Français</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=de">Deutsch</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=es">Español</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=it">Italiano</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=ru">Русский</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=pt">Português</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=nl">Nederlands</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=pl">Polski</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=ar">العربية</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=fa">فارسی</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=tr">Türkçe</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=vi">Tiếng Việt</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=id">Bahasa Indonesia</a>
+        | <a href="https://openaitx.github.io/view.html?user=predatorray&project=kubectl-tmux-exec&lang=as">অসমীয়া</
+      </div>
+    </div>
+  </details>
+</div>
+
 # kubectl-tmux-exec
 
 ![GitHub release version](https://img.shields.io/github/v/release/predatorray/kubectl-tmux-exec)
