@@ -28,6 +28,13 @@ jobs:
       uses: medyagh/setup-minikube@master
       with:
         driver: none
+        # minikube 1.39.0 switched the default container runtime to containerd.
+        # The runner only ships Docker's bundled containerd, which has the CRI
+        # plugin disabled, so `crictl version` fails against
+        # unix:///run/containerd/containerd.sock and `minikube start` aborts
+        # with RUNTIME_ENABLE. setup-minikube installs cri-dockerd for the none
+        # driver, so pin the runtime back to docker.
+        container-runtime: docker
     - name: Install Bats
       run: |
         set -ex
