@@ -24,7 +24,6 @@ declare -ra KUBECTL_ARG_SHORT_OPTS=(
 )
 
 declare -ra KUBECTL_ARG_LONG_OPTS=(
-    '--container'
     '--cluster'
     '--password'
     '--request-timeout'
@@ -137,76 +136,81 @@ function array_contains() {
     return 1
 }
 
+function __complete_value() {
+    local opt="$1"
+    case "${opt}" in
+        '--session-mode')
+            printf -- '%s\n' "${SESSION_MODES[@]}"
+            ;;
+        '--select-layout')
+            printf -- '%s\n' "${TMUX_LAYOUTS[@]}"
+            ;;
+        *)
+            if array_contains "${opt}" "${FILE_OPTS[@]}"; then
+                echo "${FILTER_FILE_COMP_DIR}"
+                return
+            fi
+            ;;
+    esac
+    echo "${NO_FILE_COMP_DIR}"
+}
+
 function __complete() {
     if [[ "$#" -eq 0 ]]; then
         exit 1
     fi
 
-    local state='INITIAL'
-    while [[ "$#" -gt 0 ]]; do
-        local arg="$1"
-        shift
+    local state='OPTS'
+    local value_opt
+    for arg in "${@:1:$#-1}"; do
         case "${state}" in
-            'INITIAL')
+            'OPTS')
                 case "${arg}" in
-                    '')
-                        ;;
-                    '-')
-                        state='INITIAL'
-                        ;;
                     '--')
-                        state='LONG_OPTS_COMP'
+                        state='CMD'
                         ;;
-                    '--session-mode')
-                        state='SESSION_MODE_COMP'
-                        ;;
-                    '--select-layout')
-                        state='TMUX_LAYOUT_COMP'
-                        ;;
-                    *)
-                        if array_contains "${arg}" "${FILE_OPTS[@]}"; then
-                            state='FILE_COMP'
-                        elif array_contains "${arg}" "${ALL_ARG_OPTS[@]}"; then
-                            state='NO_COMP'
+                    -*)
+                        if array_contains "${arg}" "${ALL_ARG_OPTS[@]}"; then
+                            state='VALUE'
+                            value_opt="${arg}"
                         fi
                         ;;
-                esac
-                ;;
-            'LONG_OPTS_COMP')
-                state='EXEC_CMD_COMP'
-                ;;
-            'SESSION_MODE_COMP' | 'TMUX_LAYOUT_COMP' | 'FILE_COMP' | 'NO_COMP')
-                case "${arg}" in
-                    '')
-                        ;;
                     *)
-                        state='INITIAL'
+                        state='CMD'
                         ;;
                 esac
                 ;;
-            *)
+            'VALUE')
+                state='OPTS'
                 ;;
         esac
     done
 
+    local cur="${!#}"
     case "${state}" in
-        'INITIAL')
-            printf -- '%s\n' "${ALL_OPTS[@]}"
-            ;;
-        'LONG_OPTS_COMP')
-            printf -- '%s\n' "${ALL_LONG_OPTS[@]}"
-            ;;
-        'SESSION_MODE_COMP')
-            printf -- '%s\n' "${SESSION_MODES[@]}"
-            ;;
-        'TMUX_LAYOUT_COMP')
-            printf -- '%s\n' "${TMUX_LAYOUTS[@]}"
-            ;;
-        'EXEC_CMD_COMP' | 'NO_COMP')
+        'CMD')
             echo "${NO_FILE_COMP_DIR}"
             ;;
-        'FILE_COMP')
-            echo "${FILTER_FILE_COMP_DIR}"
+        'VALUE')
+            __complete_value "${value_opt}"
+            ;;
+        'OPTS')
+            case "${cur}" in
+                --*=*)
+                    __complete_value "${cur%%=*}"
+                    ;;
+                --*)
+                    printf -- '%s\n' "${ALL_LONG_OPTS[@]}"
+                    echo "${NO_FILE_COMP_DIR}"
+                    ;;
+                ''|-*)
+                    printf -- '%s\n' "${ALL_OPTS[@]}"
+                    echo "${NO_FILE_COMP_DIR}"
+                    ;;
+                *)
+                    echo "${NO_FILE_COMP_DIR}"
+                    ;;
+            esac
             ;;
     esac
 }
