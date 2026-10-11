@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Resolve version
+      id: version
+      run: |
+        set -ex
+        echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+        echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+    - name: Create the CNI config directory
+      # See ci.yml: setup-minikube's none-driver setup expects this directory.
+      run: sudo mkdir -p /etc/cni/net.d
+    - name: Install minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        driver: none
+        # See ci.yml: pin the runtime to docker for the none driver.
+        container-runtime: docker
+    - name: Install Bats
+      run: |
+        set -ex
+        git clone https://github.com/bats-core/bats-core.git
+        cd bats-core
+        sudo ./install.sh /usr/local
+    - name: Make
+      run: |
+        set -ex
+        export PATH="$(pwd)/bin:$PATH"
+        make all VERSION="${{ steps.version.outputs.version }}"
+    - name: Create draft release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: ${{ steps.version.outputs.tag }}
+        VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        set -ex
+        gh release create "$TAG" \
+          --draft \
+          --title "$TAG" \
+          --generate-notes \
+          --verify-tag \
+          "output/kubectl-tmux-exec-${VERSION}.tar.gz" \
+          "output/kubectl-tmux-exec-${VERSION}.tar.gz.sha256"
