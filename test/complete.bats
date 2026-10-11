@@ -30,7 +30,6 @@ readonly ALL_OPTIONS="\
 --file
 --namespace
 --context
---container
 --cluster
 --password
 --request-timeout
@@ -58,7 +57,6 @@ readonly ALL_LONG_OPTIONS="\
 --file
 --namespace
 --context
---container
 --cluster
 --password
 --request-timeout
@@ -73,16 +71,18 @@ readonly ALL_LONG_OPTIONS="\
     output=$(bin/kubectl_complete-tmux_exec '')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}"
+    local expected_output="${ALL_OPTIONS}
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
 @test "kubectl tmux-exec -[tab]" {
     local output
-    output=$(bin/kubectl_complete-tmux_exec '')
+    output=$(bin/kubectl_complete-tmux_exec '-')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}"
+    local expected_output="${ALL_OPTIONS}
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
@@ -91,7 +91,18 @@ readonly ALL_LONG_OPTIONS="\
     output=$(bin/kubectl_complete-tmux_exec '-A')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}"
+    local expected_output="${ALL_OPTIONS}
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -n[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-n')
+    [ $? -eq 0 ]
+
+    local expected_output="${ALL_OPTIONS}
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
@@ -100,7 +111,8 @@ readonly ALL_LONG_OPTIONS="\
     output=$(bin/kubectl_complete-tmux_exec '--')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_LONG_OPTIONS}"
+    local expected_output="${ALL_LONG_OPTIONS}
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
@@ -113,9 +125,36 @@ readonly ALL_LONG_OPTIONS="\
     [ "${expected_output}" = "${output}" ]
 }
 
+@test "kubectl tmux-exec -- bash -[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--' 'bash' '-')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -l app=nginx bash [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-l' 'app=nginx' 'bash' '')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -l app=nginx ba[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-l' 'app=nginx' 'ba')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
 @test "kubectl tmux-exec --context [tab]" {
     local output
-    output=$(bin/kubectl_complete-tmux_exec '--context')
+    output=$(bin/kubectl_complete-tmux_exec '--context' '')
     [ $? -eq 0 ]
 
     local expected_output=":4"
@@ -136,7 +175,8 @@ readonly ALL_LONG_OPTIONS="\
     output=$(bin/kubectl_complete-tmux_exec '--file')
     [ $? -eq 0 ]
 
-    local expected_output=":8"
+    local expected_output="${ALL_LONG_OPTIONS}
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
@@ -149,15 +189,48 @@ readonly ALL_LONG_OPTIONS="\
     [ "${expected_output}" = "${output}" ]
 }
 
+@test "kubectl tmux-exec --file=[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--file=')
+    [ $? -eq 0 ]
+
+    local expected_output=":8"
+    [ "${expected_output}" = "${output}" ]
+}
+
 @test "kubectl tmux-exec --file - --session-mode [tab]" {
     local output
-    output=$(bin/kubectl_complete-tmux_exec '--file' '-' '--session-mode')
+    output=$(bin/kubectl_complete-tmux_exec '--file' '-' '--session-mode' '')
     [ $? -eq 0 ]
 
     local expected_output="\
 auto
 new-session
-current-session"
+current-session
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --session-mode[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--session-mode')
+    [ $? -eq 0 ]
+
+    local expected_output="${ALL_LONG_OPTIONS}
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --session-mode=[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--session-mode=')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+auto
+new-session
+current-session
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
@@ -171,7 +244,23 @@ even-horizontal
 even-vertical
 main-horizontal
 main-vertical
-tiled"
+tiled
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --select-layout=ti[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--select-layout=ti')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+even-horizontal
+even-vertical
+main-horizontal
+main-vertical
+tiled
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
@@ -189,7 +278,18 @@ tiled"
     output=$(bin/kubectl_complete-tmux_exec '--namespace' 'ns1' '--namespace' 'ns2' '')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}"
+    local expected_output="${ALL_OPTIONS}
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --namespace=ns1 -nns2 [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--namespace=ns1' '-nns2' '')
+    [ $? -eq 0 ]
+
+    local expected_output="${ALL_OPTIONS}
+:4"
     [ "${expected_output}" = "${output}" ]
 }
 
