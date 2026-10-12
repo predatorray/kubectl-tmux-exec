@@ -125,6 +125,8 @@ declare -ra SESSION_MODES=(
 readonly NO_FILE_COMP_DIR=':4'
 readonly FILTER_FILE_COMP_DIR=':8'
 
+readonly KUBECTL_REQUEST_TIMEOUT='5s'
+
 function array_contains() {
     local occur="$1"
     local arr=("${@:2}")
@@ -136,14 +138,69 @@ function array_contains() {
     return 1
 }
 
+function __kubectl() {
+    kubectl "${kubectl_opts[@]}" "$@" 2>/dev/null
+}
+
+function __kubectl_each_context() {
+    local ctx
+    for ctx in "${contexts[@]:-}"; do
+        __kubectl ${ctx:+--context "${ctx}"} "$@"
+    done
+}
+
+function __get_pods() {
+    local output="$1"
+    if [[ "${all_namespaces}" -eq 1 ]]; then
+        __kubectl_each_context get pods --all-namespaces ${selector:+--selector "${selector}"} -o "${output}"
+        return
+    fi
+    local ns
+    for ns in "${namespaces[@]:-}"; do
+        __kubectl_each_context get pods ${ns:+--namespace "${ns}"} ${selector:+--selector "${selector}"} -o "${output}"
+    done
+}
+
+function __complete_labels() {
+    local value="$1"
+    local prefix=''
+    if [[ "${value}" == *,* ]]; then
+        prefix="${value%,*},"
+    fi
+    __get_pods 'go-template={{range .items}}{{range $k, $v := .metadata.labels}}{{$k}}={{$v}}{{"\n"}}{{end}}{{end}}' \
+        | sort -u \
+        | while IFS='' read -r label; do
+            printf -- '%s%s\n' "${prefix}" "${label}"
+        done
+}
+
 function __complete_value() {
     local opt="$1"
+    local value="$2"
     case "${opt}" in
         '--session-mode')
             printf -- '%s\n' "${SESSION_MODES[@]}"
             ;;
         '--select-layout')
             printf -- '%s\n' "${TMUX_LAYOUTS[@]}"
+            ;;
+        '-n' | '--namespace')
+            __kubectl_each_context get namespaces -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' | sort -u
+            ;;
+        '--context')
+            __kubectl config get-contexts -o name
+            ;;
+        '--cluster')
+            __kubectl config view -o 'jsonpath={range .clusters[*]}{.name}{"\n"}{end}'
+            ;;
+        '--user')
+            __kubectl config view -o 'jsonpath={range .users[*]}{.name}{"\n"}{end}'
+            ;;
+        '-c' | '--container')
+            __get_pods 'jsonpath={range .items[*].spec.containers[*]}{.name}{"\n"}{end}' | sort -u
+            ;;
+        '-l' | '--selector')
+            __complete_labels "${value}"
             ;;
         *)
             if array_contains "${opt}" "${FILE_OPTS[@]}"; then
@@ -155,10 +212,37 @@ function __complete_value() {
     echo "${NO_FILE_COMP_DIR}"
 }
 
+function __record_option() {
+    local opt="$1"
+    local value="$2"
+    case "${opt}" in
+        '-n' | '--namespace')
+            namespaces+=("${value}")
+            ;;
+        '--context')
+            contexts+=("${value}")
+            ;;
+        '-l' | '--selector')
+            selector="${value}"
+            ;;
+        *)
+            if array_contains "${opt}" "${KUBECTL_ARG_SHORT_OPTS[@]}" "${KUBECTL_ARG_LONG_OPTS[@]}"; then
+                kubectl_opts+=("${opt}" "${value}")
+            fi
+            ;;
+    esac
+}
+
 function __complete() {
     if [[ "$#" -eq 0 ]]; then
         exit 1
     fi
+
+    local kubectl_opts=('--request-timeout' "${KUBECTL_REQUEST_TIMEOUT}")
+    local namespaces=()
+    local contexts=()
+    local selector=''
+    local all_namespaces=0
 
     local state='OPTS'
     local value_opt
@@ -169,10 +253,21 @@ function __complete() {
                     '--')
                         state='CMD'
                         ;;
+                    '-A' | '--all-namespaces')
+                        all_namespaces=1
+                        ;;
+                    '--insecure-skip-tls-verify')
+                        kubectl_opts+=("${arg}")
+                        ;;
+                    --*=*)
+                        __record_option "${arg%%=*}" "${arg#*=}"
+                        ;;
                     -*)
                         if array_contains "${arg}" "${ALL_ARG_OPTS[@]}"; then
                             state='VALUE'
                             value_opt="${arg}"
+                        elif array_contains "${arg:0:2}" "${ALL_ARG_SHORT_OPTS[@]}"; then
+                            __record_option "${arg:0:2}" "${arg:2}"
                         fi
                         ;;
                     *)
@@ -181,6 +276,7 @@ function __complete() {
                 esac
                 ;;
             'VALUE')
+                __record_option "${value_opt}" "${arg}"
                 state='OPTS'
                 ;;
         esac
@@ -192,12 +288,12 @@ function __complete() {
             echo "${NO_FILE_COMP_DIR}"
             ;;
         'VALUE')
-            __complete_value "${value_opt}"
+            __complete_value "${value_opt}" "${cur}"
             ;;
         'OPTS')
             case "${cur}" in
                 --*=*)
-                    __complete_value "${cur%%=*}"
+                    __complete_value "${cur%%=*}" "${cur#*=}"
                     ;;
                 --*)
                     printf -- '%s\n' "${ALL_LONG_OPTS[@]}"
