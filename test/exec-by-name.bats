@@ -15,6 +15,8 @@ setup() {
     #     share the same labels;
     #   - a statefulset "db" (selector: app=db), which controls the pod "db-0" but not the pod "db-imposter";
     #   - a service "nginx" with the same selector as the deployment, and a service "headless" without a selector;
+    #   - a replicaset, replicationcontroller, daemonset (both apps and the legacy extensions) and job named "x"
+    #     (selector: kind=KIND), each of which controls the pod "KIND-owned" but not the pod "KIND-imposter";
     #   - a configmap "conf".
     cat > "$TEST_TMP_DIR/kubectl" <<'MOCK'
 #!/usr/bin/env bash
@@ -56,6 +58,10 @@ output="$(case "$*" in
             echo "nginx-old-1 ${ns} uid-p3 uid-rs-nginx-old-${ns}"
             echo "imposter ${ns} uid-p4 uid-something-else"
             echo "bare ${ns} uid-p5"
+        elif [[ "${selector}" =~ ^kind=(.+)$ ]]; then
+            kind="${BASH_REMATCH[1]}"
+            echo "${kind}-owned ${ns} uid-p8 uid-${kind}-x-${ns}"
+            echo "${kind}-imposter ${ns} uid-p9 uid-something-else"
         elif [[ "${selector}" == 'app=db' ]]; then
             echo "db-0 ${ns} uid-p6 uid-StatefulSet-db-${ns}"
             echo "db-imposter ${ns} uid-p7 uid-something-else"
@@ -79,6 +85,21 @@ output="$(case "$*" in
     'get svc '*)
         [[ "${name}" == 'nginx' ]] && resource v1 Service 'app=nginx,env in (a,b),'
         [[ "${name}" == 'headless' ]] && resource v1 Service ''
+        ;;
+    'get rs '*)
+        [[ "${name}" == 'x' ]] && resource apps/v1 ReplicaSet 'kind=ReplicaSet,'
+        ;;
+    'get rc '*)
+        [[ "${name}" == 'x' ]] && resource v1 ReplicationController 'kind=ReplicationController,'
+        ;;
+    'get ds '*)
+        [[ "${name}" == 'x' ]] && resource apps/v1 DaemonSet 'kind=DaemonSet,'
+        ;;
+    'get daemonsets.v1beta1.extensions '*)
+        [[ "${name}" == 'x' ]] && resource extensions/v1beta1 DaemonSet 'kind=DaemonSet,'
+        ;;
+    'get job '*)
+        [[ "${name}" == 'x' ]] && resource batch/v1 Job 'kind=Job,'
         ;;
     'get cm '*)
         [[ "${name}" == 'conf' ]] && resource v1 ConfigMap ''
@@ -144,6 +165,18 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"-n default exec -i -t db-0 -- bash"* ]]
     [[ "$output" != *"db-imposter"* ]]
+}
+
+@test "Exec by name: only the pods controlled by a replicaset, replicationcontroller, daemonset or job" {
+    local type kind
+    for type_kind in rs:ReplicaSet rc:ReplicationController ds:DaemonSet daemonsets.v1beta1.extensions:DaemonSet job:Job; do
+        type="${type_kind%%:*}"
+        kind="${type_kind#*:}"
+        run bin/kubectl-tmux_exec --dry-run "${type}/x" bash
+        [ "$status" -eq 0 ]
+        [[ "$output" == *"-n default exec -i -t ${kind}-owned -- bash"* ]]
+        [[ "$output" != *"${kind}-imposter"* ]]
+    done
 }
 
 @test "Exec by name: all the pods that match the selector of a service" {

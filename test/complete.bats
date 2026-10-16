@@ -569,6 +569,15 @@ deploy/nginx
     grep -q -- 'get deploy --namespace ns1 -o jsonpath=' "${KUBECTL_STUB_LOG}"
 }
 
+@test "kubectl tmux-exec Abc/[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'Abc/')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
 @test "kubectl tmux-exec deploy/nginx ba[tab]" {
     local output
     output=$(bin/kubectl_complete-tmux_exec 'deploy/nginx' 'ba')

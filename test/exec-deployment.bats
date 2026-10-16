@@ -56,6 +56,20 @@ function setup() {
         app: ${deploy_name}
         tier: backend
         variant: other"
+
+    # A service selects the pods of both the deployments.
+    kubectl apply -n "${ns}" -f - << EOT
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${deploy_name}
+spec:
+  selector:
+    app: ${deploy_name}
+    tier: backend
+  ports:
+  - port: 80
+EOT
 }
 
 function teardown() {
@@ -94,4 +108,48 @@ function teardown() {
         run kubectl exec -n "${ns}" "${pod}" -- cat /tmp/foobar
         [ "$status" -ne 0 ]
     done
+}
+
+@test "Exec all pods that match the selector of a service by svc/NAME" {
+    local written="data-$(random_lowercase_string 8)"
+
+    bin/kubectl-tmux_exec -d -n "${ns}" "svc/${deploy_name}" -- sh -c "echo ${written} > /tmp/foobar"
+
+    wait_until_no_sessions
+
+    local pods=()
+    while read -r pod; do
+        pods+=("${pod}")
+    done < <(kubectl get pods -n "${ns}" -l "app=${deploy_name}" -o custom-columns=':metadata.name' --no-headers)
+    [ "${#pods[@]}" -eq 4 ]
+
+    for pod in "${pods[@]}"; do
+        local file_content
+        file_content="$(kubectl exec -n "${ns}" "${pod}" -- cat /tmp/foobar)"
+        [ "${file_content}" == "${written}" ]
+    done
+}
+
+@test "Exec by an unknown resource type" {
+    run bin/kubectl-tmux_exec -d -n "${ns}" Abc/foobar -- true
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"error: the server doesn't have a resource type \"Abc\""* ]]
+    [[ "$output" == *"No pods found."* ]]
+}
+
+@test "Exec by a resource that does not exist" {
+    run bin/kubectl-tmux_exec -d -n "${ns}" deploy/missing -- true
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warn: deploy/missing not found in the namespace ${ns}"* ]]
+    [[ "$output" != *"No resources found"* ]]
+    [[ "$output" == *"No pods found."* ]]
+}
+
+@test "Exec by a resource that is not supported" {
+    kubectl create configmap -n "${ns}" "${deploy_name}"
+
+    run bin/kubectl-tmux_exec -d -n "${ns}" "cm/${deploy_name}" -- true
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"selector for ConfigMap (v1) not implemented"* ]]
+    [[ "$output" == *"No pods found."* ]]
 }
