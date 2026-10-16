@@ -486,3 +486,57 @@ sidecar
     [ $? -eq 0 ]
     [ "$((SECONDS - start))" -lt 5 ]
 }
+
+@test "kubectl tmux-exec we[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'we')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+nginx-1
+web-0
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -n ns1 deploy/[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-n' 'ns1' 'deploy/')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+deploy/nginx
+:4"
+    [ "${expected_output}" = "${output}" ]
+    grep -q -- 'get deploy --namespace ns1 -o jsonpath=' "${KUBECTL_STUB_LOG}"
+}
+
+@test "kubectl tmux-exec deploy/nginx ba[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'deploy/nginx' 'ba')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec deploy/nginx -c [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'deploy/nginx' '-c' '')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+nginx
+sidecar
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --file pods.txt ba[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--file' 'pods.txt' 'ba')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}

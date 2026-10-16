@@ -160,16 +160,38 @@ function __kubectl_each_context() {
     done
 }
 
-function __get_pods() {
-    local output="$1"
+function __get_resources() {
+    local resource_type="$1"
+    local output="$2"
+    local extra_args=("${@:3}")
     if [[ "${all_namespaces}" -eq 1 ]]; then
-        __kubectl_each_context get pods --all-namespaces ${selector:+--selector "${selector}"} -o "${output}"
+        __kubectl_each_context get "${resource_type}" --all-namespaces "${extra_args[@]}" -o "${output}"
         return
     fi
     local ns
     for ns in "${namespaces[@]:-}"; do
-        __kubectl_each_context get pods ${ns:+--namespace "${ns}"} ${selector:+--selector "${selector}"} -o "${output}"
+        __kubectl_each_context get "${resource_type}" ${ns:+--namespace "${ns}"} "${extra_args[@]}" -o "${output}"
     done
+}
+
+function __get_pods() {
+    __get_resources pods "$1" ${selector:+--selector "${selector}"}
+}
+
+# Completes the NAME argument: pod names, or TYPE/NAME if the word being completed contains a slash.
+function __complete_name() {
+    local value="$1"
+    local resource_type='pods'
+    local prefix=''
+    if [[ "${value}" == */* ]]; then
+        resource_type="${value%%/*}"
+        prefix="${resource_type}/"
+    fi
+    __collect __get_resources "${resource_type}" 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' \
+        | sort -u \
+        | while IFS='' read -r name; do
+            printf -- '%s%s\n' "${prefix}" "${name}"
+        done
 }
 
 function __complete_labels() {
@@ -249,6 +271,9 @@ function __record_option() {
         '-l' | '--selector')
             selector="${value}"
             ;;
+        '-f' | '--file')
+            pod_list_file="${value}"
+            ;;
         *)
             if array_contains "${opt}" "${KUBECTL_ARG_SHORT_OPTS[@]}" "${KUBECTL_ARG_LONG_OPTS[@]}"; then
                 kubectl_opts+=("${opt}" "${value}")
@@ -266,6 +291,8 @@ function __complete() {
     local namespaces=()
     local contexts=()
     local selector=''
+    local pod_list_file=''
+    local resource=''
     local all_namespaces=0
 
     local state='OPTS'
@@ -294,7 +321,12 @@ function __complete() {
                         fi
                         ;;
                     *)
-                        state='CMD'
+                        # the NAME argument, unless the pods are already chosen by -l or -f
+                        if [[ -z "${selector}" ]] && [[ -z "${pod_list_file}" ]] && [[ -z "${resource}" ]]; then
+                            resource="${arg}"
+                        else
+                            state='CMD'
+                        fi
                         ;;
                 esac
                 ;;
@@ -327,6 +359,9 @@ function __complete() {
                     echo "${NO_FILE_COMP_DIR}"
                     ;;
                 *)
+                    if [[ -z "${selector}" ]] && [[ -z "${pod_list_file}" ]] && [[ -z "${resource}" ]]; then
+                        __complete_name "${cur}"
+                    fi
                     echo "${NO_FILE_COMP_DIR}"
                     ;;
             esac

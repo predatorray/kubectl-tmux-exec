@@ -76,11 +76,32 @@ declare -ra SESSION_MODES=(
     'current-session'
 )
 
+# Prints one line per object: KIND, NAME, NAMESPACE and the label selector of the object (if any), separated by tabs.
+# Both the selector formats are supported: a plain map (e.g. services) and matchLabels / matchExpressions
+# (e.g. deployments). Every requirement of the selector is followed by a comma.
+readonly RESOURCE_TEMPLATE='{{range .items}}{{.kind}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{.metadata.namespace}}{{"\t"}}'\
+'{{with .spec.selector}}{{if or .matchLabels .matchExpressions}}'\
+'{{range $k, $v := .matchLabels}}{{$k}}={{$v}},{{end}}'\
+'{{range .matchExpressions}}'\
+'{{if eq .operator "In"}}{{.key}} in ({{range $i, $v := .values}}{{if $i}},{{end}}{{$v}}{{end}}),'\
+'{{else if eq .operator "NotIn"}}{{.key}} notin ({{range $i, $v := .values}}{{if $i}},{{end}}{{$v}}{{end}}),'\
+'{{else if eq .operator "Exists"}}{{.key}},'\
+'{{else if eq .operator "DoesNotExist"}}!{{.key}},'\
+'{{end}}{{end}}'\
+'{{else}}{{range $k, $v := .}}{{$k}}={{$v}},{{end}}{{end}}{{end}}'\
+'{{"\n"}}{{end}}'
+
 function usage() {
     cat << EOF
-Execute a command in all containers that match the label selector using Tmux.
+Execute a command in all containers that match the label selector, the pod list, or the resource using Tmux.
 
 Examples:
+  # Open bash terminals that attach to all the pods of the deployment 'nginx'
+  ${PROG_NAME} deploy/nginx /bin/bash
+
+  # Open a bash terminal that attaches to the pod 'nginx-0'
+  ${PROG_NAME} nginx-0 /bin/bash
+
   # Keep tracking nginx access logs by running 'tail' command from all pods that match the selector 'app=nginx',
   # using the first container by default
   ${PROG_NAME} -l app=nginx -- tail -f /var/log/nginx/access.log
@@ -120,7 +141,12 @@ Options:
                          main-vertical, or tiled.
   --dry-run=false: Only print the tmux commands that would be executed.
 Usage:
-  ${PROG_NAME} { -l label | -f pod-list-file } [-c CONTAINER] [flags] -- COMMAND [args...]
+  ${PROG_NAME} { -l SELECTOR | -f FILE | NAME } [-c CONTAINER] [flags] -- COMMAND [args...]
+
+Arguments:
+  NAME: A pod name, or TYPE/NAME of a resource that is supported by 'kubectl exec' (e.g. deploy/nginx, sts/web,
+        svc/nginx). Unlike 'kubectl exec', which picks only one pod of the resource, all of its running pods are
+        chosen.
 
 Use "kubectl options" for a list of global command-line options (applies to all commands).
 EOF
@@ -169,8 +195,35 @@ function array_contains() {
     return 1
 }
 
+# Prints "POD_NAME NAMESPACE" for every pod that the resource TYPE/NAME refers to, the same way as 'kubectl exec'
+# resolves it: a pod is printed as is, while for other resources (e.g. deploy, sts, svc), all the running pods that
+# match the selector of the resource are printed instead of only the first one.
+function get_pods_by_resource() {
+    local resource_type="$1"
+    local resource_name="$2"
+    local ctx_opt="$3"
+    local ns_opts=("${@:4}")
+
+    local kind name namespace selector
+    while IFS=$'\t' read -r kind name namespace selector; do
+        if [[ -z "${name}" ]]; then
+            continue
+        fi
+        if [[ "${kind}" == 'Pod' ]]; then
+            echo "${name} ${namespace}"
+        elif [[ -z "${selector}" ]]; then
+            warn "${resource_type}/${name} in the namespace ${namespace} does not have a selector."
+        else
+            kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -n "${namespace}" -l "${selector%,}" --field-selector 'status.phase=Running' -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+        fi
+    done < <(
+        kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" "${ns_opts[@]}" --field-selector "metadata.name=${resource_name}" -o "go-template=${RESOURCE_TEMPLATE}" 2>/dev/null || true
+    )
+}
+
 function main() {
     local selector
+    local resource
     local container_name
     local namespaces=()
     local contexts=()
@@ -366,7 +419,13 @@ function main() {
                 fi
                 ;;
             *)
-                break
+                # The first argument that is not an option is the NAME, unless the pods are already chosen by -l or -f,
+                # where it is the beginning of the command instead.
+                if [[ -z "${selector:-}" ]] && [[ -z "${pod_list_file:-}" ]] && [[ -z "${resource:-}" ]]; then
+                    resource="${opt}"
+                else
+                    break
+                fi
                 ;;
         esac
         shift
@@ -378,9 +437,26 @@ function main() {
         error_and_exit 'you must specify at least one command for the container'
     fi
 
-    if ( [[ -z "${selector:-}" ]] && [[ -z "${pod_list_file:-}" ]] ) ||
-        ( [[ ! -z "${selector:-}" ]] && [[ ! -z "${pod_list_file:-}" ]] ); then
-       error_and_exit 'you must either specify option -l or -f'
+    local pod_source_count=0
+    [[ -n "${selector:-}" ]] && (( ++pod_source_count ))
+    [[ -n "${pod_list_file:-}" ]] && (( ++pod_source_count ))
+    [[ -n "${resource:-}" ]] && (( ++pod_source_count ))
+    if [[ "${pod_source_count}" -ne 1 ]]; then
+       error_and_exit 'you must specify exactly one of option -l, option -f, or a NAME'
+    fi
+
+    local resource_type resource_name
+    if [[ -n "${resource:-}" ]]; then
+        if [[ "${resource}" == */* ]]; then
+            resource_type="${resource%%/*}"
+            resource_name="${resource#*/}"
+        else
+            resource_type='pod'
+            resource_name="${resource}"
+        fi
+        if [[ -z "${resource_type}" ]] || [[ -z "${resource_name}" ]] || [[ "${resource_name}" == */* ]]; then
+            error_and_exit "invalid resource name: ${resource}"
+        fi
     fi
 
     if [[ -z "${tmux_layout}" ]] || ! array_contains "${tmux_layout}" "${TMUX_LAYOUTS[@]}"; then
@@ -420,7 +496,7 @@ function main() {
     fi
 
     local deduplicated_pod_list=()
-    if [[ -z "${selector:-}" ]]; then
+    if [[ -n "${pod_list_file:-}" ]]; then
         if [[ "${pod_list_file}" = '-' ]] && [[ -t 0 ]] && [[ -t 2 ]]; then
             echo >&2 'Reading pod names from stdin... (Press Ctrl-D at the beginning of the last line to stop reading)'
         fi
@@ -453,7 +529,9 @@ function main() {
                     fi
                     pods+=("${pod_info}")
                 done < <(
-                    if [[ -z "${selector:-}" ]]; then
+                    if [[ -n "${resource:-}" ]]; then
+                        get_pods_by_resource "${resource_type}" "${resource_name}" "${ctx_opt}" -n "${ns_opt}"
+                    elif [[ -z "${selector:-}" ]]; then
                         for pod_name in "${deduplicated_pod_list[@]}"; do
                             kubectl ${kubectl_opts[@]:-} get pod --context "${ctx_opt}" -n "${ns_opt}" "${pod_name}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
                         done
@@ -474,7 +552,9 @@ function main() {
                 fi
                 pods+=("${pod_info}")
             done < <(
-                if [[ -z "${selector:-}" ]]; then
+                if [[ -n "${resource:-}" ]]; then
+                    get_pods_by_resource "${resource_type}" "${resource_name}" "${ctx_opt}" -A
+                elif [[ -z "${selector:-}" ]]; then
                     for pod_name in "${deduplicated_pod_list[@]}"; do
                         kubectl ${kubectl_opts[@]:-} get pod --context "${ctx_opt}" -A "${pod_name}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
                     done
