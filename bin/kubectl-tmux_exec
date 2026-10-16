@@ -221,7 +221,7 @@ function get_controlled_by() {
             echo "${name} ${ns} ${uid}"
         fi
     done < <(
-        kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" -n "${namespace}" ${selector_opts[@]:+"${selector_opts[@]}"} -o "go-template=${CONTROLLED_BY_TEMPLATE}" 2>/dev/null || true
+        kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" -n "${namespace}" ${selector_opts[@]:+"${selector_opts[@]}"} -o "go-template=${CONTROLLED_BY_TEMPLATE}" || true
     )
 }
 
@@ -239,15 +239,10 @@ function get_pods_by_resource() {
     local ctx_opt="$3"
     local ns_opts=("${@:4}")
 
-    local resources errors err_file
-    err_file="$(mktemp)"
-    resources="$(kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" "${ns_opts[@]}" --field-selector "metadata.name=${resource_name}" -o "go-template=${RESOURCE_TEMPLATE}" 2>"${err_file}")" || true
-    # 'kubectl get' prints "No resources found ..." if nothing matches, which is reported as "not found" below instead.
-    errors="$(grep -v '^No resources found' "${err_file}" || true)"
-    rm -f "${err_file}"
-    if [[ -n "${errors}" ]]; then
-        # e.g. error: the server doesn't have a resource type "foo"
-        echo >&2 "${errors}"
+    local resources rc=0
+    resources="$(kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" "${ns_opts[@]}" --field-selector "metadata.name=${resource_name}" -o "go-template=${RESOURCE_TEMPLATE}")" || rc=$?
+    if [[ "${rc}" -ne 0 ]]; then
+        # kubectl has already printed the error, e.g. the server doesn't have a resource type "foo"
         return 0
     fi
     if [[ -z "${resources}" ]]; then
@@ -287,7 +282,7 @@ function get_pods_by_resource() {
                     warn "invalid service '${name}' in the namespace ${namespace}: Service is defined without a selector"
                     continue
                 fi
-                kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -n "${namespace}" -l "${selector}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+                kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -n "${namespace}" -l "${selector}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers || true
                 continue
                 ;;
             /ReplicationController|apps/ReplicaSet|extensions/ReplicaSet|apps/StatefulSet|apps/DaemonSet|extensions/DaemonSet|batch/Job)

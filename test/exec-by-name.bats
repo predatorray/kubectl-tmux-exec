@@ -109,15 +109,18 @@ output="$(case "$*" in
         ;;
 esac)"
 
-# the same as the real kubectl
+# the same as the real kubectl: with -o go-template, nothing is printed if nothing matches
+if [[ -n "${KUBECTL_STUB_WARN:-}" ]]; then
+    echo >&2 "E1016 06:00:00.000000   12345 memcache.go:287] couldn't get resource list for metrics.k8s.io/v1beta1: the server is currently unable to handle the request"
+fi
 if [[ "${output}" == 'unknown' ]]; then
     echo >&2 "error: the server doesn't have a resource type \"${args[1]}\""
     exit 1
-elif [[ -z "${output}" ]]; then
-    echo >&2 "No resources found in ${namespace} namespace."
-else
-    echo "${output}"
+elif [[ "$*" == 'get replicasets '* ]] && [[ -n "${KUBECTL_STUB_FORBID_RS:-}" ]]; then
+    echo >&2 'Error from server (Forbidden): replicasets.apps is forbidden: User "u" cannot list resource "replicasets" in API group "apps"'
+    exit 1
 fi
+echo -n "${output}${output:+$'\n'}"
 exit 0
 MOCK
     chmod +x "$TEST_TMP_DIR/kubectl"
@@ -221,7 +224,25 @@ teardown() {
     run bin/kubectl-tmux_exec --dry-run deploy/missing bash
     [ "$status" -eq 0 ]
     [[ "$output" == *"warn: deploy/missing not found"$'\n'* ]]
-    [[ "$output" != *"No resources found"* ]]
+    [[ "$output" == *"No pods found."* ]]
+}
+
+@test "Exec by name: warnings of kubectl do not discard the resources found" {
+    KUBECTL_STUB_WARN=1 run bin/kubectl-tmux_exec --dry-run web-0 bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"memcache.go:287] couldn't get resource list for metrics.k8s.io/v1beta1"* ]]
+    [[ "$output" == *" exec -i -t web-0 -- bash"* ]]
+
+    KUBECTL_STUB_WARN=1 run bin/kubectl-tmux_exec --dry-run deploy/nginx bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *" exec -i -t nginx-1 -- bash"* ]]
+    [[ "$output" == *" exec -i -t nginx-2 -- bash"* ]]
+}
+
+@test "Exec by name: the errors of kubectl are not hidden" {
+    KUBECTL_STUB_FORBID_RS=1 run bin/kubectl-tmux_exec --dry-run deploy/nginx bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'Error from server (Forbidden): replicasets.apps is forbidden'* ]]
     [[ "$output" == *"No pods found."* ]]
 }
 
