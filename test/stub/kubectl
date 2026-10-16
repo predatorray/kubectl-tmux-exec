@@ -2,7 +2,14 @@
 
 echo "$*" >> "${KUBECTL_STUB_LOG}"
 
+if [[ -n "${KUBECTL_STUB_READ_STDIN:-}" ]]; then
+    cat > /dev/null
+fi
+
+sleep "${KUBECTL_STUB_SLEEP:-0}"
+
 if [[ -n "${KUBECTL_STUB_FAIL:-}" ]]; then
+    printf 'Please enter Username: '
     exit 1
 fi
 

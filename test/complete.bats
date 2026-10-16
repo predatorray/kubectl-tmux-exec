@@ -390,7 +390,6 @@ sidecar
     [ $? -eq 0 ]
 
     local expected_output="\
-app=nginx,app=nginx
 app=nginx,tier=web
 :4"
     [ "${expected_output}" = "${output}" ]
@@ -402,7 +401,6 @@ app=nginx,tier=web
     [ $? -eq 0 ]
 
     local expected_output="\
-app=nginx,app=nginx
 app=nginx,tier=web
 :4"
     [ "${expected_output}" = "${output}" ]
@@ -416,7 +414,7 @@ app=nginx,tier=web
     local expected_calls="\
 --request-timeout 5s --kubeconfig k --context c1 get pods --namespace ns1 --selector app=nginx -o jsonpath={range .items[*].spec.containers[*]}{.name}{\"\n\"}{end}
 --request-timeout 5s --kubeconfig k --context c2 get pods --namespace ns1 --selector app=nginx -o jsonpath={range .items[*].spec.containers[*]}{.name}{\"\n\"}{end}"
-    [ "${expected_calls}" = "$(cat "${KUBECTL_STUB_LOG}")" ]
+    [ "${expected_calls}" = "$(sort "${KUBECTL_STUB_LOG}")" ]
 }
 
 @test "kubectl tmux-exec -A -n ns1 -c [tab]" {
@@ -426,7 +424,7 @@ app=nginx,tier=web
 
     local expected_calls="\
 --request-timeout 5s get pods --all-namespaces -o jsonpath={range .items[*].spec.containers[*]}{.name}{\"\n\"}{end}"
-    [ "${expected_calls}" = "$(cat "${KUBECTL_STUB_LOG}")" ]
+    [ "${expected_calls}" = "$(sort "${KUBECTL_STUB_LOG}")" ]
 }
 
 @test "kubectl tmux-exec --insecure-skip-tls-verify -s url --request-timeout=1s --file f -n [tab]" {
@@ -436,7 +434,7 @@ app=nginx,tier=web
 
     local expected_calls="\
 --request-timeout 5s --insecure-skip-tls-verify -s url --request-timeout 1s get namespaces -o jsonpath={range .items[*]}{.metadata.name}{\"\n\"}{end}"
-    [ "${expected_calls}" = "$(cat "${KUBECTL_STUB_LOG}")" ]
+    [ "${expected_calls}" = "$(sort "${KUBECTL_STUB_LOG}")" ]
 }
 
 @test "kubectl tmux-exec -n [tab] when kubectl fails" {
@@ -446,4 +444,45 @@ app=nginx,tier=web
 
     local expected_output=":4"
     [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -l app!=nginx,!tier,[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-l' 'app!=nginx,!tier,')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --context c1 --context=c1 -n ns1 -nns1 -c [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--context' 'c1' '--context=c1' '-n' 'ns1' '-nns1' '-c' '')
+    [ $? -eq 0 ]
+
+    local expected_calls="\
+--request-timeout 5s --context c1 get pods --namespace ns1 -o jsonpath={range .items[*].spec.containers[*]}{.name}{\"\n\"}{end}"
+    [ "${expected_calls}" = "$(sort "${KUBECTL_STUB_LOG}")" ]
+}
+
+@test "kubectl tmux-exec --context c1 --context c2 -n ns1 -n ns2 -c [tab] queries in parallel" {
+    local output
+    local start="${SECONDS}"
+    output=$(KUBECTL_STUB_SLEEP=2 bin/kubectl_complete-tmux_exec '--context' 'c1' '--context' 'c2' '-n' 'ns1' '-n' 'ns2' '-c' '')
+    [ $? -eq 0 ]
+    [ "$((SECONDS - start))" -lt 6 ]
+
+    local expected_output="\
+nginx
+sidecar
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -n [tab] does not pass stdin to kubectl" {
+    local output
+    local start="${SECONDS}"
+    output=$(KUBECTL_STUB_READ_STDIN=1 bin/kubectl_complete-tmux_exec '-n' '' < <(sleep 5))
+    [ $? -eq 0 ]
+    [ "$((SECONDS - start))" -lt 5 ]
 }
