@@ -141,7 +141,7 @@ function array_contains() {
 function __kubectl() {
     local output
     output="$(mktemp "${kubectl_output_dir}/XXXXXX")" || return
-    (kubectl "${kubectl_opts[@]}" "$@" < /dev/null > "${output}" 2>/dev/null || rm -f "${output}") &
+    (kubectl "${kubectl_opts[@]}" "$@" > "${output}" 2>/dev/null || rm -f "${output}") &
 }
 
 function __collect() {
