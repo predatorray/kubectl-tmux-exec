@@ -239,6 +239,31 @@ function get_pods_by_resource() {
     local ctx_opt="$3"
     local ns_opts=("${@:4}")
 
+    local resources errors err_file
+    err_file="$(mktemp)"
+    resources="$(kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" "${ns_opts[@]}" --field-selector "metadata.name=${resource_name}" -o "go-template=${RESOURCE_TEMPLATE}" 2>"${err_file}")" || true
+    # 'kubectl get' prints "No resources found ..." if nothing matches, which is reported as "not found" below instead.
+    errors="$(grep -v '^No resources found' "${err_file}" || true)"
+    rm -f "${err_file}"
+    if [[ -n "${errors}" ]]; then
+        # e.g. error: the server doesn't have a resource type "foo"
+        echo >&2 "${errors}"
+        return 0
+    fi
+    if [[ -z "${resources}" ]]; then
+        local where=''
+        if [[ "${ns_opts[0]}" == '-A' ]]; then
+            where=' in any namespace'
+        elif [[ -n "${ns_opts[1]:-}" ]]; then
+            where=" in the namespace ${ns_opts[1]}"
+        fi
+        if [[ -n "${ctx_opt}" ]]; then
+            where="${where} of the context ${ctx_opt}"
+        fi
+        warn "${resource_type}/${resource_name} not found${where}"
+        return 0
+    fi
+
     local api_version kind name namespace uid selector
     while IFS=$'\t' read -r api_version kind name namespace uid selector; do
         if [[ -z "${name}" ]]; then
@@ -286,9 +311,7 @@ function get_pods_by_resource() {
                 echo "${pod_name} ${pod_ns}"
             done < <(get_controlled_by pods "${ctx_opt}" "${namespace}" "${selector}" "${owner_uids[@]}")
         fi
-    done < <(
-        kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" "${ns_opts[@]}" --field-selector "metadata.name=${resource_name}" -o "go-template=${RESOURCE_TEMPLATE}" 2>/dev/null || true
-    )
+    done <<< "${resources}"
 }
 
 function main() {

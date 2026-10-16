@@ -71,9 +71,55 @@ readonly ALL_LONG_OPTIONS="\
 --username
 --kubeconfig"
 
+readonly RESOURCES_WITH_PODS="\
+daemonsets/
+deployments/
+pods/
+jobs/
+replicasets/
+replicationcontrollers/
+services/
+statefulsets/"
+
 @test "kubectl tmux-exec [tab]" {
     local output
     output=$(bin/kubectl_complete-tmux_exec '')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+nginx-1
+web-0
+${RESOURCES_WITH_PODS}
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec dep[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'dep')
+    [ $? -eq 0 ]
+
+    # no space after the slash, since there is no pod to complete
+    local expected_output="\
+deployments/
+:6"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec p[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'p')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+pods/
+:6"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -l app=nginx [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-l' 'app=nginx' '')
     [ $? -eq 0 ]
 
     local expected_output="${ALL_OPTIONS}
@@ -292,9 +338,14 @@ kube-system
     output=$(bin/kubectl_complete-tmux_exec '--namespace' 'ns1' '--namespace' 'ns2' '')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}
+    local expected_output="\
+nginx-1
+web-0
+${RESOURCES_WITH_PODS}
 :4"
     [ "${expected_output}" = "${output}" ]
+    grep -q -- 'get pods --namespace ns1 ' "${KUBECTL_STUB_LOG}"
+    grep -q -- 'get pods --namespace ns2 ' "${KUBECTL_STUB_LOG}"
 }
 
 @test "kubectl tmux-exec --namespace=ns1 -nns2 [tab]" {
@@ -302,9 +353,14 @@ kube-system
     output=$(bin/kubectl_complete-tmux_exec '--namespace=ns1' '-nns2' '')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}
+    local expected_output="\
+nginx-1
+web-0
+${RESOURCES_WITH_PODS}
 :4"
     [ "${expected_output}" = "${output}" ]
+    grep -q -- 'get pods --namespace ns1 ' "${KUBECTL_STUB_LOG}"
+    grep -q -- 'get pods --namespace ns2 ' "${KUBECTL_STUB_LOG}"
 }
 
 @test "kubectl tmux-exec --kubeconfig [tab]" {
@@ -493,7 +549,6 @@ sidecar
     [ $? -eq 0 ]
 
     local expected_output="\
-nginx-1
 web-0
 :4"
     [ "${expected_output}" = "${output}" ]

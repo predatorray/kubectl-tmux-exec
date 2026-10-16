@@ -43,7 +43,7 @@ function resource() {
 }
 
 ns="${namespace}"
-case "$*" in
+output="$(case "$*" in
     'get pods '*'custom-columns'*)
         if [[ "${selector}" == 'app=nginx,env in (a,b)' ]]; then
             printf '%s %s\n' nginx-1 "${ns}" nginx-2 "${ns}" nginx-old-1 "${ns}" imposter "${ns}" bare "${ns}"
@@ -83,7 +83,20 @@ case "$*" in
     'get cm '*)
         [[ "${name}" == 'conf' ]] && resource v1 ConfigMap ''
         ;;
-esac
+    'get Abc '*)
+        echo 'unknown'
+        ;;
+esac)"
+
+# the same as the real kubectl
+if [[ "${output}" == 'unknown' ]]; then
+    echo >&2 "error: the server doesn't have a resource type \"${args[1]}\""
+    exit 1
+elif [[ -z "${output}" ]]; then
+    echo >&2 "No resources found in ${namespace} namespace."
+else
+    echo "${output}"
+fi
 exit 0
 MOCK
     chmod +x "$TEST_TMP_DIR/kubectl"
@@ -174,6 +187,26 @@ teardown() {
 @test "Exec by name: resource not found" {
     run bin/kubectl-tmux_exec --dry-run deploy/missing bash
     [ "$status" -eq 0 ]
+    [[ "$output" == *"warn: deploy/missing not found"$'\n'* ]]
+    [[ "$output" != *"No resources found"* ]]
+    [[ "$output" == *"No pods found."* ]]
+}
+
+@test "Exec by name: resource not found in the namespaces of the contexts" {
+    run bin/kubectl-tmux_exec --dry-run -n ns1 --context c1 deploy/missing bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warn: deploy/missing not found in the namespace ns1 of the context c1"* ]]
+
+    run bin/kubectl-tmux_exec --dry-run -A deploy/missing bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warn: deploy/missing not found in any namespace"* ]]
+}
+
+@test "Exec by name: unknown resource type" {
+    run bin/kubectl-tmux_exec --dry-run Abc/foobar bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"error: the server doesn't have a resource type \"Abc\""* ]]
+    [[ "$output" != *"not found"* ]]
     [[ "$output" == *"No pods found."* ]]
 }
 

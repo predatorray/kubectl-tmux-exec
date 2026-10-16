@@ -123,9 +123,23 @@ declare -ra SESSION_MODES=(
 # Cobra's Shell Comp Directive Constants
 # also see: https://github.com/spf13/cobra/blob/main/completions.go
 readonly NO_FILE_COMP_DIR=':4'
+readonly NO_FILE_NO_SPACE_COMP_DIR=':6'
 readonly FILTER_FILE_COMP_DIR=':8'
 
 readonly KUBECTL_REQUEST_TIMEOUT='5s'
+
+# The resource types that contain pods, which are completed as TYPE/ for the NAME argument, the same as 'kubectl exec'
+# (see doPodResourceCompletion in k8s.io/kubectl/pkg/util/completion)
+declare -ra RESOURCES_WITH_PODS=(
+    'daemonsets'
+    'deployments'
+    'pods'
+    'jobs'
+    'replicasets'
+    'replicationcontrollers'
+    'services'
+    'statefulsets'
+)
 
 function array_contains() {
     local occur="$1"
@@ -178,7 +192,8 @@ function __get_pods() {
     __get_resources pods "$1" ${selector:+--selector "${selector}"}
 }
 
-# Completes the NAME argument: pod names, or TYPE/NAME if the word being completed contains a slash.
+# Completes the NAME argument, the same as 'kubectl exec': pod names and the TYPE/ of the resources that contain pods,
+# or TYPE/NAME if the word being completed contains a slash.
 function __complete_name() {
     local value="$1"
     local resource_type='pods'
@@ -187,11 +202,34 @@ function __complete_name() {
         resource_type="${value%%/*}"
         prefix="${resource_type}/"
     fi
-    __collect __get_resources "${resource_type}" 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' \
-        | sort -u \
-        | while IFS='' read -r name; do
-            printf -- '%s%s\n' "${prefix}" "${name}"
-        done
+
+    local names=()
+    local name
+    while IFS='' read -r name; do
+        if [[ "${prefix}${name}" == "${value}"* ]]; then
+            names+=("${prefix}${name}")
+        fi
+    done < <(__collect __get_resources "${resource_type}" 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' | sort -u)
+    if [[ "${#names[@]}" -gt 0 ]]; then
+        printf -- '%s\n' "${names[@]}"
+    fi
+
+    if [[ -n "${prefix}" ]]; then
+        echo "${NO_FILE_COMP_DIR}"
+        return
+    fi
+    local type
+    for type in "${RESOURCES_WITH_PODS[@]}"; do
+        if [[ "${type}" == "${value}"* ]]; then
+            echo "${type}/"
+        fi
+    done
+    if [[ "${#names[@]}" -eq 0 ]]; then
+        # only TYPE/ is completed, so do not add a space after the slash
+        echo "${NO_FILE_NO_SPACE_COMP_DIR}"
+    else
+        echo "${NO_FILE_COMP_DIR}"
+    fi
 }
 
 function __complete_labels() {
@@ -354,15 +392,19 @@ function __complete() {
                     printf -- '%s\n' "${ALL_LONG_OPTS[@]}"
                     echo "${NO_FILE_COMP_DIR}"
                     ;;
-                ''|-*)
+                -*)
                     printf -- '%s\n' "${ALL_OPTS[@]}"
                     echo "${NO_FILE_COMP_DIR}"
                     ;;
                 *)
                     if [[ -z "${selector}" ]] && [[ -z "${pod_list_file}" ]] && [[ -z "${resource}" ]]; then
                         __complete_name "${cur}"
+                    elif [[ -z "${cur}" ]]; then
+                        printf -- '%s\n' "${ALL_OPTS[@]}"
+                        echo "${NO_FILE_COMP_DIR}"
+                    else
+                        echo "${NO_FILE_COMP_DIR}"
                     fi
-                    echo "${NO_FILE_COMP_DIR}"
                     ;;
             esac
             ;;
