@@ -90,6 +90,7 @@ statefulsets/"
 nginx-1
 web-0
 ${RESOURCES_WITH_PODS}
+${ALL_OPTIONS}
 :4"
     [ "${expected_output}" = "${output}" ]
 }
@@ -342,6 +343,7 @@ kube-system
 nginx-1
 web-0
 ${RESOURCES_WITH_PODS}
+${ALL_OPTIONS}
 :4"
     [ "${expected_output}" = "${output}" ]
     grep -q -- 'get pods --namespace ns1 ' "${KUBECTL_STUB_LOG}"
@@ -357,6 +359,7 @@ ${RESOURCES_WITH_PODS}
 nginx-1
 web-0
 ${RESOURCES_WITH_PODS}
+${ALL_OPTIONS}
 :4"
     [ "${expected_output}" = "${output}" ]
     grep -q -- 'get pods --namespace ns1 ' "${KUBECTL_STUB_LOG}"

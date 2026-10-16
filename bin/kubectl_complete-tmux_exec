@@ -193,7 +193,7 @@ function __get_pods() {
 }
 
 # Completes the NAME argument, the same as 'kubectl exec': pod names and the TYPE/ of the resources that contain pods,
-# or TYPE/NAME if the word being completed contains a slash.
+# or TYPE/NAME if the word being completed contains a slash. The options are also completed if the word is empty.
 function __complete_name() {
     local value="$1"
     local resource_type='pods'
@@ -224,7 +224,10 @@ function __complete_name() {
             echo "${type}/"
         fi
     done
-    if [[ "${#names[@]}" -eq 0 ]]; then
+    if [[ -z "${value}" ]]; then
+        printf -- '%s\n' "${ALL_OPTS[@]}"
+        echo "${NO_FILE_COMP_DIR}"
+    elif [[ "${#names[@]}" -eq 0 ]]; then
         # only TYPE/ is completed, so do not add a space after the slash
         echo "${NO_FILE_NO_SPACE_COMP_DIR}"
     else
