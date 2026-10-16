@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+echo "$*" >> "${KUBECTL_STUB_LOG}"
+
+if [[ -n "${KUBECTL_STUB_READ_STDIN:-}" ]]; then
+    cat > /dev/null
+fi
+
+sleep "${KUBECTL_STUB_SLEEP:-0}"
+
+if [[ -n "${KUBECTL_STUB_FAIL:-}" ]]; then
+    printf 'Please enter Username: '
+    exit 1
+fi
+
+case "$*" in
+    *'config get-contexts'*)
+        printf 'ctx1\nctx2\n'
+        ;;
+    *'config view'*'.clusters'*)
+        printf 'cluster1\ncluster2\n'
+        ;;
+    *'config view'*'.users'*)
+        printf 'user1\n'
+        ;;
+    *'get namespaces'*)
+        printf 'default\nkube-system\n'
+        ;;
+    *'get pods'*'.containers'*)
+        printf 'nginx\nsidecar\nnginx\n'
+        ;;
+    *'get pods'*'go-template'*)
+        printf 'tier=web\napp=nginx\napp=nginx\n'
+        ;;
+    *)
+        exit 1
+        ;;
+esac
