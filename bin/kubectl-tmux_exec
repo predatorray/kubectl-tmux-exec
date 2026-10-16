@@ -76,10 +76,11 @@ declare -ra SESSION_MODES=(
     'current-session'
 )
 
-# Prints one line per object: KIND, NAME, NAMESPACE and the label selector of the object (if any), separated by tabs.
-# Both the selector formats are supported: a plain map (e.g. services) and matchLabels / matchExpressions
-# (e.g. deployments). Every requirement of the selector is followed by a comma.
-readonly RESOURCE_TEMPLATE='{{range .items}}{{.kind}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{.metadata.namespace}}{{"\t"}}'\
+# Prints one line per object: API_VERSION, KIND, NAME, NAMESPACE, UID and the label selector of the object (if any),
+# separated by tabs. Both the selector formats are supported: a plain map (e.g. services) and matchLabels /
+# matchExpressions (e.g. deployments). Every requirement of the selector is followed by a comma.
+readonly RESOURCE_TEMPLATE='{{range .items}}{{.apiVersion}}{{"\t"}}{{.kind}}{{"\t"}}{{.metadata.name}}{{"\t"}}'\
+'{{.metadata.namespace}}{{"\t"}}{{.metadata.uid}}{{"\t"}}'\
 '{{with .spec.selector}}{{if or .matchLabels .matchExpressions}}'\
 '{{range $k, $v := .matchLabels}}{{$k}}={{$v}},{{end}}'\
 '{{range .matchExpressions}}'\
@@ -90,6 +91,10 @@ readonly RESOURCE_TEMPLATE='{{range .items}}{{.kind}}{{"\t"}}{{.metadata.name}}{
 '{{end}}{{end}}'\
 '{{else}}{{range $k, $v := .}}{{$k}}={{$v}},{{end}}{{end}}{{end}}'\
 '{{"\n"}}{{end}}'
+
+# Prints one line per object: NAME, NAMESPACE, UID and the UID of its controller (if any), separated by spaces.
+readonly CONTROLLED_BY_TEMPLATE='{{range .items}}{{.metadata.name}} {{.metadata.namespace}} {{.metadata.uid}}'\
+'{{range .metadata.ownerReferences}}{{if .controller}} {{.uid}}{{end}}{{end}}{{"\n"}}{{end}}'
 
 function usage() {
     cat << EOF
@@ -144,9 +149,10 @@ Usage:
   ${PROG_NAME} { -l SELECTOR | -f FILE | NAME } [-c CONTAINER] [flags] -- COMMAND [args...]
 
 Arguments:
-  NAME: A pod name, or TYPE/NAME of a resource that is supported by 'kubectl exec' (e.g. deploy/nginx, sts/web,
-        svc/nginx). Unlike 'kubectl exec', which picks only one pod of the resource, all of its running pods are
-        chosen.
+  NAME: A pod name, or TYPE/NAME of a resource that is supported by 'kubectl exec': a pod, service, deployment,
+        replicaset, replicationcontroller, statefulset, daemonset or job (e.g. deploy/nginx, sts/web, svc/nginx).
+        Unlike 'kubectl exec', which picks only one pod of the resource, all of its pods are chosen. For a workload,
+        only the pods it controls are chosen, not the others that happen to match its selector.
 
 Use "kubectl options" for a list of global command-line options (applies to all commands).
 EOF
@@ -195,26 +201,90 @@ function array_contains() {
     return 1
 }
 
+# Prints "NAME NAMESPACE UID" of the objects of RESOURCE_TYPE in NAMESPACE that match the SELECTOR and are controlled by
+# (i.e. the controller owner reference is) one of the OWNER_UIDS.
+function get_controlled_by() {
+    local resource_type="$1"
+    local ctx_opt="$2"
+    local namespace="$3"
+    local selector="$4"
+    local owner_uids=("${@:5}")
+
+    local selector_opts=()
+    if [[ -n "${selector}" ]]; then
+        selector_opts=(-l "${selector}")
+    fi
+
+    local name ns uid controller_uid
+    while read -r name ns uid controller_uid; do
+        if [[ -n "${name}" ]] && [[ -n "${controller_uid}" ]] && array_contains "${controller_uid}" "${owner_uids[@]}"; then
+            echo "${name} ${ns} ${uid}"
+        fi
+    done < <(
+        kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" -n "${namespace}" ${selector_opts[@]:+"${selector_opts[@]}"} -o "go-template=${CONTROLLED_BY_TEMPLATE}" 2>/dev/null || true
+    )
+}
+
 # Prints "POD_NAME NAMESPACE" for every pod that the resource TYPE/NAME refers to, the same way as 'kubectl exec'
-# resolves it: a pod is printed as is, while for other resources (e.g. deploy, sts, svc), all the running pods that
-# match the selector of the resource are printed instead of only the first one.
+# resolves it (see SelectorsForObject in k8s.io/kubectl/pkg/polymorphichelpers), except that all the pods are printed
+# instead of only the first one:
+#   - a pod is printed as is;
+#   - for a service, all the pods that match its selector;
+#   - for a replicaset, replicationcontroller, statefulset, daemonset, job or deployment, all the pods that match its
+#     selector, and, unlike 'kubectl exec', are also controlled by it (via a replicaset for a deployment), so that the
+#     pods that merely share the labels are not included.
 function get_pods_by_resource() {
     local resource_type="$1"
     local resource_name="$2"
     local ctx_opt="$3"
     local ns_opts=("${@:4}")
 
-    local kind name namespace selector
-    while IFS=$'\t' read -r kind name namespace selector; do
+    local api_version kind name namespace uid selector
+    while IFS=$'\t' read -r api_version kind name namespace uid selector; do
         if [[ -z "${name}" ]]; then
             continue
         fi
-        if [[ "${kind}" == 'Pod' ]]; then
-            echo "${name} ${namespace}"
-        elif [[ -z "${selector}" ]]; then
-            warn "${resource_type}/${name} in the namespace ${namespace} does not have a selector."
-        else
-            kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -n "${namespace}" -l "${selector%,}" --field-selector 'status.phase=Running' -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+        selector="${selector%,}"
+
+        local api_group=''
+        if [[ "${api_version}" == */* ]]; then
+            api_group="${api_version%/*}"
+        fi
+
+        local owner_uids=()
+        case "${api_group}/${kind}" in
+            /Pod)
+                echo "${name} ${namespace}"
+                continue
+                ;;
+            /Service)
+                if [[ -z "${selector}" ]]; then
+                    warn "invalid service '${name}' in the namespace ${namespace}: Service is defined without a selector"
+                    continue
+                fi
+                kubectl ${kubectl_opts[@]:-} get pods --context "${ctx_opt}" -n "${namespace}" -l "${selector}" -o custom-columns=':metadata.name,:metadata.namespace' --no-headers 2>/dev/null || true
+                continue
+                ;;
+            /ReplicationController|apps/ReplicaSet|extensions/ReplicaSet|apps/StatefulSet|apps/DaemonSet|extensions/DaemonSet|batch/Job)
+                owner_uids=("${uid}")
+                ;;
+            apps/Deployment|extensions/Deployment)
+                local rs_name rs_ns rs_uid
+                while read -r rs_name rs_ns rs_uid; do
+                    owner_uids+=("${rs_uid}")
+                done < <(get_controlled_by replicasets "${ctx_opt}" "${namespace}" "${selector}" "${uid}")
+                ;;
+            *)
+                warn "cannot exec into ${resource_type}/${name} in the namespace ${namespace}: selector for ${kind} (${api_version}) not implemented"
+                continue
+                ;;
+        esac
+
+        if [[ "${#owner_uids[@]}" -gt 0 ]]; then
+            local pod_name pod_ns pod_uid
+            while read -r pod_name pod_ns pod_uid; do
+                echo "${pod_name} ${pod_ns}"
+            done < <(get_controlled_by pods "${ctx_opt}" "${namespace}" "${selector}" "${owner_uids[@]}")
         fi
     done < <(
         kubectl ${kubectl_opts[@]:-} get "${resource_type}" --context "${ctx_opt}" "${ns_opts[@]}" --field-selector "metadata.name=${resource_name}" -o "go-template=${RESOURCE_TEMPLATE}" 2>/dev/null || true

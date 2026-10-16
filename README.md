@@ -93,8 +93,12 @@ The pods are chosen by exactly one of the following:
 
 - `-l SELECTOR`: all the pods that match the label selector.
 - `-f FILE`: the pod names listed line-by-line in a file (or `-` for stdin).
-- `NAME`: a pod name, or `TYPE/NAME` of any resource that `kubectl exec` accepts (e.g. `deploy/nginx`, `sts/web`, `rs/nginx-5d9f`, `svc/nginx`, `job/backup`).
-  Unlike `kubectl exec`, which picks only one pod of the resource, all of its running pods are chosen.
+- `NAME`: a pod name, or `TYPE/NAME` of any resource that `kubectl exec` accepts: a pod, service, deployment, replicaset,
+  replicationcontroller, statefulset, daemonset or job (e.g. `deploy/nginx`, `sts/web`, `svc/nginx`, `job/backup`).
+  The pods are resolved the same way as `kubectl exec` does, except that all of them are chosen instead of only one:
+  - for a service, all the pods that match its selector;
+  - for a workload, all the pods that match its selector **and** are controlled by it (through its replicasets for a
+    deployment), so that other pods that happen to share the same labels are not included.
 
 ### Options
 

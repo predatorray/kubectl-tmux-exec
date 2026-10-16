@@ -7,7 +7,15 @@ setup() {
     export PATH="$TEST_TMP_DIR:$PATH"
     export KUBECTL_ARGS_LOG="${TEST_TMP_DIR}/kubectl.args"
 
-    # Mock kubectl: emulate a pod "web-0", a deployment "nginx" and a service "headless" without any selector.
+    # Mock kubectl, in every namespace:
+    #   - a pod "web-0";
+    #   - a deployment "nginx" (selector: app=nginx,env in (a,b)), which controls the replicaset "nginx-new", which
+    #     controls the pods "nginx-1" and "nginx-2". The orphaned replicaset "nginx-old" controls the pod "nginx-old-1",
+    #     the pod "imposter" is controlled by something else and the pod "bare" is not controlled at all, all of which
+    #     share the same labels;
+    #   - a statefulset "db" (selector: app=db), which controls the pod "db-0" but not the pod "db-imposter";
+    #   - a service "nginx" with the same selector as the deployment, and a service "headless" without a selector;
+    #   - a configmap "conf".
     cat > "$TEST_TMP_DIR/kubectl" <<'MOCK'
 #!/usr/bin/env bash
 echo "$*" >> "${KUBECTL_ARGS_LOG}"
@@ -26,29 +34,54 @@ for (( i = 0; i < ${#args[@]}; i++ )); do
     esac
 done
 
+function resource() {
+    local api_version="$1" kind="$2" sel="$3"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${api_version}" "${kind}" "${name}" "${namespace}" "uid-${kind}-${name}-${namespace}" "${sel}"
+    if [[ "${all_namespaces}" -eq 1 ]]; then
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${api_version}" "${kind}" "${name}" 'other' "uid-${kind}-${name}-other" "${sel}"
+    fi
+}
+
+ns="${namespace}"
 case "$*" in
-    'get pods '*)
+    'get pods '*'custom-columns'*)
         if [[ "${selector}" == 'app=nginx,env in (a,b)' ]]; then
-            printf 'nginx-1 %s\nnginx-2 %s\n' "${namespace}" "${namespace}"
+            printf '%s %s\n' nginx-1 "${ns}" nginx-2 "${ns}" nginx-old-1 "${ns}" imposter "${ns}" bare "${ns}"
+        fi
+        ;;
+    'get pods '*'go-template'*)
+        if [[ "${selector}" == 'app=nginx,env in (a,b)' ]]; then
+            echo "nginx-1 ${ns} uid-p1 uid-rs-nginx-new-${ns}"
+            echo "nginx-2 ${ns} uid-p2 uid-rs-nginx-new-${ns}"
+            echo "nginx-old-1 ${ns} uid-p3 uid-rs-nginx-old-${ns}"
+            echo "imposter ${ns} uid-p4 uid-something-else"
+            echo "bare ${ns} uid-p5"
+        elif [[ "${selector}" == 'app=db' ]]; then
+            echo "db-0 ${ns} uid-p6 uid-StatefulSet-db-${ns}"
+            echo "db-imposter ${ns} uid-p7 uid-something-else"
+        fi
+        ;;
+    'get replicasets '*)
+        if [[ "${selector}" == 'app=nginx,env in (a,b)' ]]; then
+            echo "nginx-new ${ns} uid-rs-nginx-new-${ns} uid-Deployment-nginx-${ns}"
+            echo "nginx-old ${ns} uid-rs-nginx-old-${ns}"
         fi
         ;;
     'get pod '*|'get po '*)
-        if [[ "${name}" == 'web-0' ]]; then
-            printf 'Pod\tweb-0\tdefault\t\n'
-        fi
+        [[ "${name}" == 'web-0' ]] && resource v1 Pod ''
         ;;
     'get deploy '*)
-        if [[ "${name}" == 'nginx' ]]; then
-            printf 'Deployment\tnginx\t%s\tapp=nginx,env in (a,b),\n' "${namespace}"
-            if [[ "${all_namespaces}" -eq 1 ]]; then
-                printf 'Deployment\tnginx\tother\tapp=nginx,env in (a,b),\n'
-            fi
-        fi
+        [[ "${name}" == 'nginx' ]] && resource apps/v1 Deployment 'app=nginx,env in (a,b),'
+        ;;
+    'get sts '*)
+        [[ "${name}" == 'db' ]] && resource apps/v1 StatefulSet 'app=db,'
         ;;
     'get svc '*)
-        if [[ "${name}" == 'headless' ]]; then
-            printf 'Service\theadless\tdefault\t\n'
-        fi
+        [[ "${name}" == 'nginx' ]] && resource v1 Service 'app=nginx,env in (a,b),'
+        [[ "${name}" == 'headless' ]] && resource v1 Service ''
+        ;;
+    'get cm '*)
+        [[ "${name}" == 'conf' ]] && resource v1 ConfigMap ''
         ;;
 esac
 exit 0
@@ -80,19 +113,40 @@ teardown() {
     [[ "$output" == *" exec -i -t web-0 -- bash"* ]]
 }
 
-@test "Exec by name: all the running pods of a deployment" {
+@test "Exec by name: only the pods controlled by a deployment" {
     run bin/kubectl-tmux_exec --dry-run deploy/nginx -c nginx -- bash
     [ "$status" -eq 0 ]
     [[ "$output" == *"-n default exec -i -t -c nginx nginx-1 -- bash"* ]]
     [[ "$output" == *"-n default exec -i -t -c nginx nginx-2 -- bash"* ]]
-    grep -q -- '--field-selector status.phase=Running' "${KUBECTL_ARGS_LOG}"
+    [[ "$output" != *"nginx-old-1"* ]]
+    [[ "$output" != *"imposter"* ]]
+    [[ "$output" != *"bare"* ]]
+    # not filtered by the pod phase, the same as -l
+    run grep -q -- 'status.phase' "${KUBECTL_ARGS_LOG}"
+    [ "$status" -eq 1 ]
+}
+
+@test "Exec by name: only the pods controlled by a statefulset" {
+    run bin/kubectl-tmux_exec --dry-run sts/db bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"-n default exec -i -t db-0 -- bash"* ]]
+    [[ "$output" != *"db-imposter"* ]]
+}
+
+@test "Exec by name: all the pods that match the selector of a service" {
+    run bin/kubectl-tmux_exec --dry-run svc/nginx bash
+    [ "$status" -eq 0 ]
+    for pod in nginx-1 nginx-2 nginx-old-1 imposter bare; do
+        [[ "$output" == *" exec -i -t ${pod} -- bash"* ]]
+    done
 }
 
 @test "Exec by name: the deployments under all namespaces" {
     run bin/kubectl-tmux_exec --dry-run -A deploy/nginx bash
     [ "$status" -eq 0 ]
     [[ "$output" == *"-n default exec -i -t nginx-1 -- bash"* ]]
-    [[ "$output" == *"-n other exec -i -t nginx-2 -- bash"* ]]
+    [[ "$output" == *"-n other exec -i -t nginx-1 -- bash"* ]]
+    [[ "$output" != *"imposter"* ]]
     grep -q '^get deploy .*-A --field-selector metadata.name=nginx' "${KUBECTL_ARGS_LOG}"
 }
 
@@ -103,10 +157,17 @@ teardown() {
     [[ "$output" == *"-n ns2 exec -i -t nginx-2 -- bash"* ]]
 }
 
-@test "Exec by name: a resource without any selector" {
+@test "Exec by name: a service without any selector" {
     run bin/kubectl-tmux_exec --dry-run svc/headless bash
     [ "$status" -eq 0 ]
-    [[ "$output" == *"warn: svc/headless in the namespace default does not have a selector."* ]]
+    [[ "$output" == *"warn: invalid service 'headless' in the namespace default: Service is defined without a selector"* ]]
+    [[ "$output" == *"No pods found."* ]]
+}
+
+@test "Exec by name: an unsupported resource" {
+    run bin/kubectl-tmux_exec --dry-run cm/conf bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warn: cannot exec into cm/conf in the namespace default: selector for ConfigMap (v1) not implemented"* ]]
     [[ "$output" == *"No pods found."* ]]
 }
 
