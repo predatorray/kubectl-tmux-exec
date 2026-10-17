@@ -125,8 +125,8 @@ The usage of these options is also available by `--help`.
 
 The options `-i` / `--stdin` and `-t` / `--tty` have no effect since both are enabled by default. Previously they were
 ignored with a warning; now using either of them fails with an error. To go back to the previous behavior (ignore them
-with a warning), set the environment variable `KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED` to `1` (or `true`), e.g. in your shell
-profile:
+with a warning), set the environment variable `KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED` to any value other than empty or `0`,
+e.g. in your shell profile:
 
 ```sh
 export KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1

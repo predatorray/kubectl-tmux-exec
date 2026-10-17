@@ -153,8 +153,20 @@ teardown() {
     [[ "$output" != *"error:"* ]]
 }
 
-@test "Parse: deprecated options still fail when KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED is not truthy" {
+@test "Parse: deprecated options pass with any non-empty, non-zero KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED" {
+    KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=yes run bin/kubectl-tmux_exec -l app=nginx -i --dry-run bash
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warn: The option -i is deprecated"* ]]
+}
+
+@test "Parse: deprecated options still fail when KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED is 0" {
     KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=0 run bin/kubectl-tmux_exec -l app=nginx -i --dry-run bash
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"error: The option -i is deprecated"* ]]
+}
+
+@test "Parse: deprecated options still fail when KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED is empty" {
+    KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED= run bin/kubectl-tmux_exec -l app=nginx -i --dry-run bash
     [ "$status" -ne 0 ]
     [[ "$output" == *"error: The option -i is deprecated"* ]]
 }

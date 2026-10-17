@@ -188,15 +188,15 @@ function error_option_requires_arg() {
 }
 
 # -i / --stdin and -t / --tty are enabled by default. Using them is an error, unless KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED
-# is set to 1 or true, in which case they are ignored with a warning as before.
+# is set to anything other than empty or 0, in which case they are ignored with a warning as before.
 function error_deprecated_option() {
     local msg="The option ${1} is deprecated and has no effect, since it's enabled by default."
     case "${KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED:-}" in
-        1|true|TRUE|True)
-            warn "${msg}"
+        ''|0)
+            error_and_exit "${msg} Remove it, or set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning."
             ;;
         *)
-            error_and_exit "${msg} Remove it, or set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning."
+            warn "${msg}"
             ;;
     esac
 }
