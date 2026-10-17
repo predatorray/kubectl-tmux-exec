@@ -133,9 +133,28 @@ teardown() {
     [[ "$output" == *"error: unknown option: --foo"* ]]
 }
 
-@test "Parse: deprecated -i and -t options warn but pass" {
-    run bin/kubectl-tmux_exec -l app=nginx -i -t --dry-run bash
+@test "Parse: deprecated -i option fails" {
+    run bin/kubectl-tmux_exec -l app=nginx -i --dry-run bash
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"error: The option -i is deprecated"*"KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1"* ]]
+}
+
+@test "Parse: deprecated --tty option fails" {
+    run bin/kubectl-tmux_exec -l app=nginx --tty --dry-run bash
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"error: The option --tty is deprecated"* ]]
+}
+
+@test "Parse: deprecated -i and -t options warn but pass with KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED" {
+    KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 run bin/kubectl-tmux_exec -l app=nginx -i -t --dry-run bash
     [ "$status" -eq 0 ]
-    [[ "$output" == *"warn: The option -i / --stdin is deprecated."* ]]
-    [[ "$output" == *"warn: The option -t / --tty is deprecated."* ]]
+    [[ "$output" == *"warn: The option -i is deprecated"* ]]
+    [[ "$output" == *"warn: The option -t is deprecated"* ]]
+    [[ "$output" != *"error:"* ]]
+}
+
+@test "Parse: deprecated options still fail when KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED is not truthy" {
+    KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=0 run bin/kubectl-tmux_exec -l app=nginx -i --dry-run bash
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"error: The option -i is deprecated"* ]]
 }
