@@ -16,10 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     # Runs the whole suite, against a real cluster, once per bash version. The scripts start with
     # `#!/usr/bin/env bash`, so putting the bash built here first on the PATH makes both them and Bats run on it.
-    name: build (bash ${{ matrix.bash }})
+    name: test (bash ${{ matrix.bash }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -99,4 +99,19 @@ jobs:
         bash --version
         export PATH="$(pwd)/bin:$PATH"
         make
+
+  build:
+    # The single check that branch protection requires, so that the bash versions above can change without updating it.
+    # It must run even if a test job fails or is cancelled, since a skipped required check counts as passed.
+    name: build
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check the results of all the bash versions
+      env:
+        RESULT: ${{ needs.test.result }}
+      run: |
+        echo "test: ${RESULT}"
+        [[ "${RESULT}" == 'success' ]]
 
