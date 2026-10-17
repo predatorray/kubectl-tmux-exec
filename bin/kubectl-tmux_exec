@@ -126,10 +126,6 @@ Options:
   --context='': The name of the kubeconfig context to use (can be applied multiple times)
   -A, --all-namespaces=false: If present, list and execute the requested object(s) across all namespaces.
                               Namespace in current context is ignored even if specified with --namespace.
-  -i, --stdin=true: Pass stdin to the container (deprecated and rejected, since it's enabled by default.
-                    Set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning instead)
-  -t, --tty=true: Stdin is a TTY (deprecated and rejected, since it's enabled by default.
-                  Set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning instead)
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -f, --file: Read pod names line-by-line from a file
   -d, --detach=false: Make the Tmux session detached
@@ -142,6 +138,10 @@ Options:
   --select-layout=tiled: One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
                          main-vertical, or tiled.
   --dry-run=false: Only print the tmux commands that would be executed.
+  -i, --stdin=true: Pass stdin to the container (deprecated and rejected, since it's enabled by default.
+                    Set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning instead)
+  -t, --tty=true: Stdin is a TTY (deprecated and rejected, since it's enabled by default.
+                  Set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning instead)
 Usage:
   ${PROG_NAME} { -l SELECTOR | -f FILE | NAME } [-c CONTAINER] [flags] -- COMMAND [args...]
 
