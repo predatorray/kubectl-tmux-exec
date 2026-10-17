@@ -193,7 +193,7 @@ function error_deprecated_option() {
     local msg="The option ${1} is deprecated and has no effect, since it's enabled by default."
     case "${KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED:-}" in
         ''|0)
-            error_and_exit "${msg} Remove it, or set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning."
+            error_and_exit "${msg}"$'\n''To ignore it, set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1'
             ;;
         *)
             warn "${msg}"
