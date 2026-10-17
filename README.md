@@ -108,8 +108,6 @@ The pods are chosen by exactly one of the following:
 | `-l`<br>`--selector`            | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must use either `--selector`, `--file` or a `NAME`. |
 | `-f`<br>`--file`                | Read pod names line-by-line from a file.<br>You must use either `--selector`, `--file` or a `NAME`.                                                            |
 | `-c`<br>`--container`           | Container name. If omitted, the first container in the pod will be chosen                                                                                   |
-| `-i`<br>`--stdin`               | Pass stdin to the container (**deprecated**, since it's enabled by default)                                                                                 |
-| `-t`<br>`--tty`                 | Stdin is a TTY (**deprecated**, since it's enabled by default)                                                                                              |
 | `-d`<br>`--detach`              | Make the Tmux session detached                                                                                                                              |
 | `-n`<br>`--namespace=`          | The namespace scope for this CLI request (can be applied multiple times)                                                                                    |
 | `--context`                     | The name of the kubeconfig context to use (can be applied multiple times)                                                                                   |
@@ -118,8 +116,21 @@ The pods are chosen by exactly one of the following:
 | `--remain-on-exit`              | Remain Tmux window on exit                                                                                                                                  |
 | `--select-layout`               | One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, or tiled.                                              |
 | `--session-mode`                | Where tmux is opened: auto, new-session, current-session                                                                                                    |
+| `-i`<br>`--stdin`               | Pass stdin to the container (**deprecated**, since it's enabled by default; using it is an error, see [Deprecated Options](#deprecated-options))              |
+| `-t`<br>`--tty`                 | Stdin is a TTY (**deprecated**, since it's enabled by default; using it is an error, see [Deprecated Options](#deprecated-options))                           |
 
 The usage of these options is also available by `--help`.
+
+### Deprecated Options
+
+The options `-i` / `--stdin` and `-t` / `--tty` have no effect since both are enabled by default. Previously they were
+ignored with a warning; now using either of them fails with an error. To go back to the previous behavior (ignore them
+with a warning), set the environment variable `KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED` to any value other than empty or `0`,
+e.g. in your shell profile:
+
+```sh
+export KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1
+```
 
 ### Example
 

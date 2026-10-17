@@ -126,8 +126,6 @@ Options:
   --context='': The name of the kubeconfig context to use (can be applied multiple times)
   -A, --all-namespaces=false: If present, list and execute the requested object(s) across all namespaces.
                               Namespace in current context is ignored even if specified with --namespace.
-  -i, --stdin=true: Pass stdin to the container (deprecated, since it's enabled by default)
-  -t, --tty=true: Stdin is a TTY (deprecated, since it's enabled by default)
   -l, --selector: Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -f, --file: Read pod names line-by-line from a file
   -d, --detach=false: Make the Tmux session detached
@@ -140,6 +138,10 @@ Options:
   --select-layout=tiled: One of the five Tmux preset layouts: even-horizontal, even-vertical, main-horizontal,
                          main-vertical, or tiled.
   --dry-run=false: Only print the tmux commands that would be executed.
+  -i, --stdin=true: Pass stdin to the container (deprecated and rejected, since it's enabled by default.
+                    Set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning instead)
+  -t, --tty=true: Stdin is a TTY (deprecated and rejected, since it's enabled by default.
+                  Set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1 to ignore it with a warning instead)
 Usage:
   ${PROG_NAME} { -l SELECTOR | -f FILE | NAME } [-c CONTAINER] [flags] -- COMMAND [args...]
 
@@ -183,6 +185,20 @@ function error_and_exit() {
 
 function error_option_requires_arg() {
     error_and_exit "option ${1} requires an argument"
+}
+
+# -i / --stdin and -t / --tty are enabled by default. Using them is an error, unless KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED
+# is set to anything other than empty or 0, in which case they are ignored with a warning as before.
+function error_deprecated_option() {
+    local msg="The option ${1} is deprecated and has no effect, since it's enabled by default."
+    case "${KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED:-}" in
+        ''|0)
+            error_and_exit "${msg}"$'\n''To ignore it, set KUBECTL_TMUX_EXEC_ALLOW_DEPRECATED=1'
+            ;;
+        *)
+            warn "${msg}"
+            ;;
+    esac
 }
 
 function array_contains() {
@@ -390,11 +406,8 @@ function main() {
                     contexts+=("${val}")
                 fi
                 ;;
-            -i|--stdin)
-                warn "The option -i / --stdin is deprecated."
-                ;;
-            -t|--tty)
-                warn "The option -t / --tty is deprecated."
+            -i|--stdin|-t|--tty)
+                error_deprecated_option "${opt}"
                 ;;
             -l|--selector)
                 shift

@@ -42,8 +42,6 @@ declare -ra ALL_NOARG_SHORT_OPTS=(
     '-A'
     '-h'
     '-V'
-    '-i'
-    '-t'
     '-d'
     '-C'
 )
@@ -65,8 +63,6 @@ declare -ra ALL_NOARG_LONG_OPTS=(
     '--help'
     '--version'
     '--dry-run'
-    '--stdin'
-    '--tty'
     '--detach'
     '--remain-on-exit'
     '--all-namespaces'
