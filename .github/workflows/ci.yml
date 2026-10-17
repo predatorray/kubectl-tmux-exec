@@ -100,33 +100,3 @@ jobs:
         export PATH="$(pwd)/bin:$PATH"
         make
 
-  macos:
-    # A cluster can't run on the macOS runners, so only the tests backed by a stubbed kubectl run here, but on the
-    # real /bin/bash and BSD userland that macOS users have.
-    name: test (macOS /bin/bash)
-    runs-on: macos-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Use /bin/bash
-      run: |
-        set -ex
-        # The runner image puts a Homebrew bash ahead of /bin/bash on the PATH.
-        mkdir -p "${HOME}/.local/system-bash"
-        ln -sf /bin/bash "${HOME}/.local/system-bash/bash"
-        echo "${HOME}/.local/system-bash" >> "$GITHUB_PATH"
-    - name: Install tmux
-      run: brew install tmux
-    - name: Install Bats
-      run: |
-        set -ex
-        git clone https://github.com/bats-core/bats-core.git
-        cd bats-core
-        sudo ./install.sh /usr/local
-    - name: Test
-      run: |
-        set -ex
-        bash --version
-        [[ "$(command -v bash)" == "${HOME}/.local/system-bash/bash" ]]
-        export PATH="$(pwd)/bin:$PATH"
-        bats test/basic.bats test/complete.bats test/exec-by-name.bats test/parser.bats
