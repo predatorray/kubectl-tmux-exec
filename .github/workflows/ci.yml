@@ -11,13 +11,65 @@ on:
   schedule:
     - cron: '0 16 * * SAT'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-    name: build
+  test:
+    # Runs the whole suite, against a real cluster, once per bash version. The scripts start with
+    # `#!/usr/bin/env bash`, so putting the bash built here first on the PATH makes both them and Bats run on it.
+    name: test (bash ${{ matrix.bash }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bash:
+        # The /bin/bash of macOS, frozen at the last GPLv2 release.
+        - '3.2.57'
+        # The oldest bash still shipped by a supported enterprise distro: RHEL 8 / Rocky / Alma (until 2029).
+        - '4.4.18'
+        # RHEL 9 and Ubuntu 22.04 LTS.
+        - '5.1.16'
+        # The most widespread today: Ubuntu 24.04 LTS, Debian 12 and 13.
+        - '5.2.37'
+        # The latest release, which Homebrew users on macOS get.
+        - '5.3'
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+    - name: Cache bash ${{ matrix.bash }}
+      id: cache-bash
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/bash
+        key: bash-${{ matrix.bash }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/ci.yml') }}
+    - name: Build bash ${{ matrix.bash }}
+      if: steps.cache-bash.outputs.cache-hit != 'true'
+      env:
+        BASH_SRC_VERSION: ${{ matrix.bash }}
+      run: |
+        set -ex
+        # Old releases are K&R C, which newer compilers reject by default (C23 drops it, gcc 14 turns implicit
+        # declarations into errors), so pin each to a C dialect it was written for.
+        case "${BASH_SRC_VERSION}" in
+        3.*|4.*) std=gnu89 ;;
+        *)       std=gnu17 ;;
+        esac
+        cd "$(mktemp -d)"
+        curl -fsSL --retry 5 "https://ftp.gnu.org/gnu/bash/bash-${BASH_SRC_VERSION}.tar.gz" | tar xz --strip-components=1
+        # bash's own malloc predates and breaks on modern glibc.
+        ./configure --prefix="${HOME}/.local/bash" --without-bash-malloc CFLAGS="-O2 -w -std=${std}"
+        make -j"$(nproc)"
+        make install
+    - name: Use bash ${{ matrix.bash }}
+      env:
+        BASH_SRC_VERSION: ${{ matrix.bash }}
+      run: |
+        set -ex
+        echo "${HOME}/.local/bash/bin" >> "$GITHUB_PATH"
+        version="$("${HOME}/.local/bash/bin/bash" -c 'echo "${BASH_VERSION}"')"
+        [[ "${version}" == "${BASH_SRC_VERSION}"[.\(]* ]]
     - name: Create the CNI config directory
       # setup-minikube's none-driver setup runs `chmod 755 /etc/cni/net.d`,
       # assuming the directory was already created by the podman package that
@@ -44,5 +96,22 @@ jobs:
     - name: Make
       run: |
         set -ex
+        bash --version
         export PATH="$(pwd)/bin:$PATH"
         make
+
+  build:
+    # The single check that branch protection requires, so that the bash versions above can change without updating it.
+    # It must run even if a test job fails or is cancelled, since a skipped required check counts as passed.
+    name: build
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check the results of all the bash versions
+      env:
+        RESULT: ${{ needs.test.result }}
+      run: |
+        echo "test: ${RESULT}"
+        [[ "${RESULT}" == 'success' ]]
+

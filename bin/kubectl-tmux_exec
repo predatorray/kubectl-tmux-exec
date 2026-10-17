@@ -57,11 +57,6 @@ declare -ra SCRIPT_NOARG_SHORT_OPTS=(
     'A' 'h' 'V' 'i' 't' 'd' 'C'
 )
 
-# Options that DO require an argument
-declare -ra SCRIPT_ARG_SHORT_OPTS=(
-    'c' 'l' 'f' 'n'
-)
-
 declare -ra TMUX_LAYOUTS=(
     'even-horizontal'
     'even-vertical'
@@ -327,6 +322,13 @@ function main() {
 
     while [[ $# -gt 0 ]]; do
         local opt="$1"
+        # Unbundle the combined short options that take no argument, e.g. -Al into -A -l. This is done before the case
+        # below, instead of in a branch that falls through to the unknown options with ';&', which requires bash 4.
+        if [[ "${opt}" == -[!-]?* ]] && array_contains "${opt:1:1}" "${SCRIPT_NOARG_SHORT_OPTS[@]}"; then
+            shift
+            set -- "${opt:0:2}" "-${opt:2}" "$@"
+            continue
+        fi
         case "${opt}" in
             -h|--help)
                 usage
@@ -456,22 +458,11 @@ function main() {
                 shift
                 break
                 ;;
-            -??*)
-                local first="${opt:0:2}"
-                local first_char="${first:1}"
-                local rest="${opt:2}"
-
-                if array_contains "${first_char}" "${SCRIPT_NOARG_SHORT_OPTS[@]}" || \
-                   array_contains "${first_char}" "${SCRIPT_ARG_SHORT_OPTS[@]}" || \
-                   array_contains "${first_char}" "${KUBECTL_SHORT_OPTS[@]}"; then
-                    shift
-                    set -- "${first}" "-${rest}" "$@"
-                    continue
-                fi
-                # Fall through to unknown option handling
-                ;&
             -*)
-                if [[ "${opt}" =~ ^--(.+)=(.+)$ ]]; then
+                # The regexes are kept in variables, since bash 3.2 cannot parse the parentheses of literal ones.
+                local long_opt_with_val_re='^--(.+)=(.+)$'
+                local long_opt_re='^--(.+)$'
+                if [[ "${opt}" =~ ${long_opt_with_val_re} ]]; then
                     local name="${BASH_REMATCH[1]}"
                     local val="${BASH_REMATCH[2]}"
                     if array_contains "${name}" "${KUBECTL_LONG_OPTS[@]}"; then
@@ -479,7 +470,7 @@ function main() {
                     else
                         error_and_exit "unknown option: ${opt}"
                     fi
-                elif [[ "${opt}" =~ ^--(.+)$ ]]; then
+                elif [[ "${opt}" =~ ${long_opt_re} ]]; then
                     local name="${BASH_REMATCH[1]}"
                     if array_contains "${name}" "${KUBECTL_NOARG_LONG_OPTS[@]}"; then
                         kubectl_opts+=("${opt}")
@@ -502,6 +493,9 @@ function main() {
                     else
                         error_and_exit "unknown option: ${opt}"
                     fi
+                elif array_contains "${opt:1:1}" "${KUBECTL_SHORT_OPTS[@]}"; then
+                    # An attached argument, e.g. -sURL
+                    kubectl_opts+=("${opt:0:2}" "${opt:2}")
                 else
                     error_and_exit "unknown option: ${opt}"
                 fi

@@ -73,6 +73,19 @@ teardown() {
     grep -q "^server1$" "${TMPDIR_MOCK_OUT}/kubectl.args"
 }
 
+@test "Parse: kubectl pass-through short option with attached arg -sserver1" {
+    run bin/kubectl-tmux_exec -l app=nginx -sserver1 --dry-run bash
+    [ "$status" -eq 0 ]
+    grep -q "^-s$" "${TMPDIR_MOCK_OUT}/kubectl.args"
+    grep -q "^server1$" "${TMPDIR_MOCK_OUT}/kubectl.args"
+}
+
+@test "Parse: unknown option in combined short options -Ax" {
+    run bin/kubectl-tmux_exec -Ax -l app=nginx --dry-run bash
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"error: unknown option: -x"* ]]
+}
+
 @test "Parse: kubectl pass-through long option with '=' --kubeconfig=/tmp/kc" {
     run bin/kubectl-tmux_exec -l app=nginx --kubeconfig=/tmp/kc --dry-run bash
     [ "$status" -eq 0 ]
