@@ -459,7 +459,10 @@ function main() {
                 break
                 ;;
             -*)
-                if [[ "${opt}" =~ ^--(.+)=(.+)$ ]]; then
+                # The regexes are kept in variables, since bash 3.2 cannot parse the parentheses of literal ones.
+                local long_opt_with_val_re='^--(.+)=(.+)$'
+                local long_opt_re='^--(.+)$'
+                if [[ "${opt}" =~ ${long_opt_with_val_re} ]]; then
                     local name="${BASH_REMATCH[1]}"
                     local val="${BASH_REMATCH[2]}"
                     if array_contains "${name}" "${KUBECTL_LONG_OPTS[@]}"; then
@@ -467,7 +470,7 @@ function main() {
                     else
                         error_and_exit "unknown option: ${opt}"
                     fi
-                elif [[ "${opt}" =~ ^--(.+)$ ]]; then
+                elif [[ "${opt}" =~ ${long_opt_re} ]]; then
                     local name="${BASH_REMATCH[1]}"
                     if array_contains "${name}" "${KUBECTL_NOARG_LONG_OPTS[@]}"; then
                         kubectl_opts+=("${opt}")

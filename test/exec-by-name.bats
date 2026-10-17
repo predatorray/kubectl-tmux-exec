@@ -45,7 +45,10 @@ function resource() {
 }
 
 ns="${namespace}"
-output="$(case "$*" in
+kind_re='^kind=(.+)$'
+# Not a case inside $(...), which bash 3.2 cannot parse, since it takes the ')' of a pattern as the end of it.
+function respond() {
+case "$*" in
     'get pods '*'custom-columns'*)
         if [[ "${selector}" == 'app=nginx,env in (a,b)' ]]; then
             printf '%s %s\n' nginx-1 "${ns}" nginx-2 "${ns}" nginx-old-1 "${ns}" imposter "${ns}" bare "${ns}"
@@ -58,7 +61,7 @@ output="$(case "$*" in
             echo "nginx-old-1 ${ns} uid-p3 uid-rs-nginx-old-${ns}"
             echo "imposter ${ns} uid-p4 uid-something-else"
             echo "bare ${ns} uid-p5"
-        elif [[ "${selector}" =~ ^kind=(.+)$ ]]; then
+        elif [[ "${selector}" =~ ${kind_re} ]]; then
             kind="${BASH_REMATCH[1]}"
             echo "${kind}-owned ${ns} uid-p8 uid-${kind}-x-${ns}"
             echo "${kind}-imposter ${ns} uid-p9 uid-something-else"
@@ -107,7 +110,9 @@ output="$(case "$*" in
     'get Abc '*)
         echo 'unknown'
         ;;
-esac)"
+esac
+}
+output="$(respond "$@")"
 
 # the same as the real kubectl: with -o go-template, nothing is printed if nothing matches
 if [[ -n "${KUBECTL_STUB_WARN:-}" ]]; then
