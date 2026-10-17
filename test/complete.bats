@@ -9,8 +9,6 @@ readonly ALL_OPTIONS="\
 -A
 -h
 -V
--i
--t
 -d
 -C
 -c
@@ -21,8 +19,6 @@ readonly ALL_OPTIONS="\
 --help
 --version
 --dry-run
---stdin
---tty
 --detach
 --remain-on-exit
 --all-namespaces
@@ -48,8 +44,6 @@ readonly ALL_LONG_OPTIONS="\
 --help
 --version
 --dry-run
---stdin
---tty
 --detach
 --remain-on-exit
 --all-namespaces
@@ -166,6 +160,17 @@ pods/
     local expected_output="${ALL_LONG_OPTIONS}
 :4"
     [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -[tab] does not complete the deprecated -i and -t options" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-')
+    [ $? -eq 0 ]
+
+    local opt
+    for opt in -i -t --stdin --tty; do
+        [[ $'\n'"${output}"$'\n' != *$'\n'"${opt}"$'\n'* ]]
+    done
 }
 
 @test "kubectl tmux-exec -- [tab]" {
