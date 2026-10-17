@@ -29,6 +29,12 @@ case "$*" in
     *'get pods'*'.containers'*)
         printf 'nginx\nsidecar\nnginx\n'
         ;;
+    *'get pods'*'.metadata.name'*)
+        printf 'web-0\nnginx-1\nweb-0\n'
+        ;;
+    *'get deploy'*'.metadata.name'*)
+        printf 'nginx\n'
+        ;;
     *'get pods'*'go-template'*)
         printf 'tier=web\napp=nginx\napp=nginx\n'
         ;;

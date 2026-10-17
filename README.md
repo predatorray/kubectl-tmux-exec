@@ -16,6 +16,12 @@ To execute command across all the Nginx containers using `bash` for example, run
 kubectl tmux-exec -l app=nginx /bin/bash
 ```
 
+Or, just like `kubectl exec`, but into **all** the pods of a deployment (or any other resource that `kubectl exec` supports):
+
+```sh
+kubectl tmux-exec deploy/nginx /bin/bash
+```
+
 ## Installation 
 
 ### Homebrew
@@ -77,13 +83,30 @@ kubectl tmux-exec --help
 kubectl-tmux_exec --help
 ```
 
+### Usage
+
+```sh
+kubectl tmux-exec { -l SELECTOR | -f FILE | NAME } [-c CONTAINER] [flags] -- COMMAND [args...]
+```
+
+The pods are chosen by exactly one of the following:
+
+- `-l SELECTOR`: all the pods that match the label selector.
+- `-f FILE`: the pod names listed line-by-line in a file (or `-` for stdin).
+- `NAME`: a pod name, or `TYPE/NAME` of any resource that `kubectl exec` accepts: a pod, service, deployment, replicaset,
+  replicationcontroller, statefulset, daemonset or job (e.g. `deploy/nginx`, `sts/web`, `svc/nginx`, `job/backup`).
+  The pods are resolved the same way as `kubectl exec` does, except that all of them are chosen instead of only one:
+  - for a service, all the pods that match its selector;
+  - for a workload, all the pods that match its selector **and** are controlled by it (through its replicasets for a
+    deployment), so that other pods that happen to share the same labels are not included.
+
 ### Options
 
 | Flag                            | Usage                                                                                                                                                       |
 |---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `-V`<br>`--version`             | Print the version information                                                                                                                               |
-| `-l`<br>`--selector`            | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must either use `--selector` or `--file` option. |
-| `-f`<br>`--file`                | Read pod names line-by-line from a file.<br>You must either use `--selector` or `--file` option.                                                            |
+| `-l`<br>`--selector`            | Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)<br>You must use either `--selector`, `--file` or a `NAME`. |
+| `-f`<br>`--file`                | Read pod names line-by-line from a file.<br>You must use either `--selector`, `--file` or a `NAME`.                                                            |
 | `-c`<br>`--container`           | Container name. If omitted, the first container in the pod will be chosen                                                                                   |
 | `-i`<br>`--stdin`               | Pass stdin to the container (**deprecated**, since it's enabled by default)                                                                                 |
 | `-t`<br>`--tty`                 | Stdin is a TTY (**deprecated**, since it's enabled by default)                                                                                              |
@@ -100,12 +123,18 @@ The usage of these options is also available by `--help`.
 
 ### Example
 
-The `tmux-exec` is similar to `exec`, except that it requires label selectors while `exec` requires a pod name.
+The `tmux-exec` is similar to `exec`, except that it executes the command in multiple pods at once.
 
 To `bash` into all pod containers that share some common labels, `foo=bar` for instance.
 
 ```sh
 kubectl tmux-exec -l foo=bar /bin/bash
+```
+
+To `bash` into all the pods of the statefulset `web`, in the `nginx` container.
+
+```sh
+kubectl tmux-exec sts/web -c nginx /bin/bash
 ```
 
 After you have successfully `bash`-ed into your selected containers, a Tmux window is opened actually, where each pane displays the execution result of each pod's container. Your keyboard inputs will be synchronized to all those panes.

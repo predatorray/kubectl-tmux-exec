@@ -56,3 +56,29 @@ function teardown() {
     
     [ "${file_content}" == "${written}" ]
 }
+
+@test "Exec one pod by name" {
+    local written="data-$(random_lowercase_string 8)"
+
+    bin/kubectl-tmux_exec -d "${pod_name}" -- sh -c "echo ${written} > /tmp/foobar"
+
+    wait_until_no_sessions
+
+    local file_content
+    file_content="$(kubectl exec "${pod_name}" -- cat /tmp/foobar)"
+
+    [ "${file_content}" == "${written}" ]
+}
+
+@test "Exec one pod by pod/NAME" {
+    local written="data-$(random_lowercase_string 8)"
+
+    bin/kubectl-tmux_exec -d "pod/${pod_name}" -- sh -c "echo ${written} > /tmp/foobar"
+
+    wait_until_no_sessions
+
+    local file_content
+    file_content="$(kubectl exec "${pod_name}" -- cat /tmp/foobar)"
+
+    [ "${file_content}" == "${written}" ]
+}

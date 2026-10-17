@@ -71,9 +71,56 @@ readonly ALL_LONG_OPTIONS="\
 --username
 --kubeconfig"
 
+readonly RESOURCES_WITH_PODS="\
+daemonsets/
+deployments/
+pods/
+jobs/
+replicasets/
+replicationcontrollers/
+services/
+statefulsets/"
+
 @test "kubectl tmux-exec [tab]" {
     local output
     output=$(bin/kubectl_complete-tmux_exec '')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+nginx-1
+web-0
+${RESOURCES_WITH_PODS}
+${ALL_OPTIONS}
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec dep[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'dep')
+    [ $? -eq 0 ]
+
+    # no space after the slash, since there is no pod to complete
+    local expected_output="\
+deployments/
+:6"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec p[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'p')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+pods/
+:6"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -l app=nginx [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-l' 'app=nginx' '')
     [ $? -eq 0 ]
 
     local expected_output="${ALL_OPTIONS}
@@ -292,9 +339,15 @@ kube-system
     output=$(bin/kubectl_complete-tmux_exec '--namespace' 'ns1' '--namespace' 'ns2' '')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}
+    local expected_output="\
+nginx-1
+web-0
+${RESOURCES_WITH_PODS}
+${ALL_OPTIONS}
 :4"
     [ "${expected_output}" = "${output}" ]
+    grep -q -- 'get pods --namespace ns1 ' "${KUBECTL_STUB_LOG}"
+    grep -q -- 'get pods --namespace ns2 ' "${KUBECTL_STUB_LOG}"
 }
 
 @test "kubectl tmux-exec --namespace=ns1 -nns2 [tab]" {
@@ -302,9 +355,15 @@ kube-system
     output=$(bin/kubectl_complete-tmux_exec '--namespace=ns1' '-nns2' '')
     [ $? -eq 0 ]
 
-    local expected_output="${ALL_OPTIONS}
+    local expected_output="\
+nginx-1
+web-0
+${RESOURCES_WITH_PODS}
+${ALL_OPTIONS}
 :4"
     [ "${expected_output}" = "${output}" ]
+    grep -q -- 'get pods --namespace ns1 ' "${KUBECTL_STUB_LOG}"
+    grep -q -- 'get pods --namespace ns2 ' "${KUBECTL_STUB_LOG}"
 }
 
 @test "kubectl tmux-exec --kubeconfig [tab]" {
@@ -485,4 +544,66 @@ sidecar
     output=$(KUBECTL_STUB_READ_STDIN=1 bin/kubectl_complete-tmux_exec '-n' '' < <(sleep 5))
     [ $? -eq 0 ]
     [ "$((SECONDS - start))" -lt 5 ]
+}
+
+@test "kubectl tmux-exec we[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'we')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+web-0
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec -n ns1 deploy/[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '-n' 'ns1' 'deploy/')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+deploy/nginx
+:4"
+    [ "${expected_output}" = "${output}" ]
+    grep -q -- 'get deploy --namespace ns1 -o jsonpath=' "${KUBECTL_STUB_LOG}"
+}
+
+@test "kubectl tmux-exec Abc/[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'Abc/')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec deploy/nginx ba[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'deploy/nginx' 'ba')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec deploy/nginx -c [tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec 'deploy/nginx' '-c' '')
+    [ $? -eq 0 ]
+
+    local expected_output="\
+nginx
+sidecar
+:4"
+    [ "${expected_output}" = "${output}" ]
+}
+
+@test "kubectl tmux-exec --file pods.txt ba[tab]" {
+    local output
+    output=$(bin/kubectl_complete-tmux_exec '--file' 'pods.txt' 'ba')
+    [ $? -eq 0 ]
+
+    local expected_output=":4"
+    [ "${expected_output}" = "${output}" ]
 }
