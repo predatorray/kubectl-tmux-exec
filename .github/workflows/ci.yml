@@ -59,7 +59,9 @@ jobs:
         cd "$(mktemp -d)"
         curl -fsSL --retry 5 "https://ftp.gnu.org/gnu/bash/bash-${BASH_SRC_VERSION}.tar.gz" | tar xz --strip-components=1
         # bash's own malloc predates and breaks on modern glibc.
-        ./configure --prefix="${HOME}/.local/bash" --without-bash-malloc CFLAGS="-O2 -w -std=${std}"
+        # Bash 3.2 builds helpers such as mkbuiltins with CFLAGS_FOR_BUILD, independently of CFLAGS.
+        ./configure --prefix="${HOME}/.local/bash" --without-bash-malloc \
+          CFLAGS="-O2 -w -std=${std}" CFLAGS_FOR_BUILD="-O2 -w -std=${std}"
         make -j"$(nproc)"
         make install
     - name: Use bash ${{ matrix.bash }}
